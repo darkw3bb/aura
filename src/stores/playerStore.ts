@@ -53,6 +53,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     });
     try {
       await api.playTrack(track);
+      api.scrobble(track.id).catch(() => {});
     } catch (e) {
       set({ isPlaying: false, currentTrack: null });
       console.error('Play error:', e);
@@ -72,6 +73,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     });
     try {
       await api.playTrackInContext(tracks, index);
+      api.scrobble(track.id).catch(() => {});
     } catch (e) {
       set({ isPlaying: false, currentTrack: null });
       console.error('Play error:', e);
@@ -102,6 +104,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         elapsedSecs: 0,
         durationSecs: track.duration ?? null,
       });
+      api.scrobble(track.id).catch(() => {});
     }
   },
 
@@ -114,6 +117,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         elapsedSecs: 0,
         durationSecs: track.duration ?? null,
       });
+      api.scrobble(track.id).catch(() => {});
     }
   },
 
