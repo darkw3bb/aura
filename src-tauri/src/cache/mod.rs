@@ -1,7 +1,7 @@
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 
-use crate::subsonic::models::{Album, Artist, FlatSong, Song};
+use crate::subsonic::models::{Album, AlbumDetail, Artist, ArtistDetail, FlatSong, Song};
 
 pub struct CacheDb {
     conn: Connection,
@@ -353,6 +353,142 @@ impl CacheDb {
             results.push(row.map_err(|e| format!("Row error: {}", e))?);
         }
         Ok(results)
+    }
+
+    pub fn get_artist_detail(&self, id: &str) -> Result<Option<ArtistDetail>, String> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, album_count, cover_art FROM artists WHERE id = ?1")
+            .map_err(|e| format!("Prepare error: {}", e))?;
+
+        let artist = stmt
+            .query_row(params![id], |row| {
+                Ok(ArtistDetail {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    album_count: row.get(2)?,
+                    cover_art: row.get(3)?,
+                    album: None,
+                })
+            })
+            .optional()
+            .map_err(|e| format!("Query error: {}", e))?;
+
+        let mut artist = match artist {
+            Some(a) => a,
+            None => return Ok(None),
+        };
+
+        let mut album_stmt = self
+            .conn
+            .prepare(
+                "SELECT id, name, artist, artist_id, cover_art, song_count, duration, year, genre
+                 FROM albums WHERE artist_id = ?1
+                 ORDER BY year, name",
+            )
+            .map_err(|e| format!("Prepare error: {}", e))?;
+
+        let albums = album_stmt
+            .query_map(params![id], |row| {
+                Ok(Album {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    artist: row.get(2)?,
+                    artist_id: row.get(3)?,
+                    cover_art: row.get(4)?,
+                    song_count: row.get(5)?,
+                    duration: row.get(6)?,
+                    year: row.get(7)?,
+                    genre: row.get(8)?,
+                    created: None,
+                    user_rating: None,
+                })
+            })
+            .map_err(|e| format!("Query error: {}", e))?;
+
+        let mut album_list = Vec::new();
+        for row in albums {
+            album_list.push(row.map_err(|e| format!("Row error: {}", e))?);
+        }
+        artist.album = Some(album_list);
+        Ok(Some(artist))
+    }
+
+    pub fn get_album_detail(&self, id: &str) -> Result<Option<AlbumDetail>, String> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT id, name, artist, artist_id, cover_art, song_count, duration, year, genre
+                 FROM albums WHERE id = ?1",
+            )
+            .map_err(|e| format!("Prepare error: {}", e))?;
+
+        let album = stmt
+            .query_row(params![id], |row| {
+                Ok(AlbumDetail {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    artist: row.get(2)?,
+                    artist_id: row.get(3)?,
+                    cover_art: row.get(4)?,
+                    song_count: row.get(5)?,
+                    duration: row.get(6)?,
+                    year: row.get(7)?,
+                    genre: row.get(8)?,
+                    song: None,
+                    user_rating: None,
+                })
+            })
+            .optional()
+            .map_err(|e| format!("Query error: {}", e))?;
+
+        let mut album = match album {
+            Some(a) => a,
+            None => return Ok(None),
+        };
+
+        let mut track_stmt = self
+            .conn
+            .prepare(
+                "SELECT id, title, album, album_id, artist, artist_id,
+                        track_num, year, genre, duration, bit_rate, cover_art,
+                        user_rating, disc_number
+                 FROM tracks WHERE album_id = ?1
+                 ORDER BY disc_number, track_num",
+            )
+            .map_err(|e| format!("Prepare error: {}", e))?;
+
+        let tracks = track_stmt
+            .query_map(params![id], |row| {
+                Ok(Song {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    album: row.get(2)?,
+                    album_id: row.get(3)?,
+                    artist: row.get(4)?,
+                    artist_id: row.get(5)?,
+                    track: row.get(6)?,
+                    year: row.get(7)?,
+                    genre: row.get(8)?,
+                    duration: row.get(9)?,
+                    bit_rate: row.get(10)?,
+                    cover_art: row.get(11)?,
+                    user_rating: row.get(12)?,
+                    disc_number: row.get(13)?,
+                    size: None,
+                    content_type: None,
+                    suffix: None,
+                    path: None,
+                })
+            })
+            .map_err(|e| format!("Query error: {}", e))?;
+
+        let mut song_list = Vec::new();
+        for row in tracks {
+            song_list.push(row.map_err(|e| format!("Row error: {}", e))?);
+        }
+        album.song = Some(song_list);
+        Ok(Some(album))
     }
 
     pub fn update_track_rating(&self, track_id: &str, rating: i32) -> Result<(), String> {

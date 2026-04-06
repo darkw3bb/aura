@@ -70,6 +70,19 @@ pub async fn get_artist(
     state: tauri::State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<ArtistDetail, String> {
+    if let Some(ref cache) = *state.cache.lock() {
+        if let Ok(Some(mut artist)) = cache.get_artist_detail(&id) {
+            if let Some(ref mut albums) = artist.album {
+                for album in albums.iter_mut() {
+                    if album.cover_art.is_none() {
+                        album.cover_art = Some(album.id.clone());
+                    }
+                }
+            }
+            return Ok(artist);
+        }
+    }
+
     let client = state.client.lock().clone().ok_or("Not connected")?;
     let mut artist = client.get_artist(&id).await?;
     if let Some(ref mut albums) = artist.album {
@@ -87,6 +100,15 @@ pub async fn get_album(
     state: tauri::State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<AlbumDetail, String> {
+    if let Some(ref cache) = *state.cache.lock() {
+        if let Ok(Some(mut album)) = cache.get_album_detail(&id) {
+            if album.cover_art.is_none() {
+                album.cover_art = Some(album.id.clone());
+            }
+            return Ok(album);
+        }
+    }
+
     let client = state.client.lock().clone().ok_or("Not connected")?;
     let mut album = client.get_album(&id).await?;
     if album.cover_art.is_none() {
