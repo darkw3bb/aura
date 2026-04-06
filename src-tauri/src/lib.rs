@@ -1,0 +1,173 @@
+mod audio;
+mod cache;
+mod commands;
+mod media_controls;
+mod subsonic;
+
+use cache::CacheDb;
+use media_controls::MediaControlManager;
+use parking_lot::Mutex;
+use souvlaki::MediaControlEvent;
+use std::sync::Arc;
+use subsonic::client::SubsonicClient;
+
+pub struct AppState {
+    pub client: Mutex<Option<SubsonicClient>>,
+    pub cache: Mutex<Option<CacheDb>>,
+    pub player: Mutex<audio::Player>,
+    pub media_controls: Mutex<MediaControlManager>,
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    env_logger::init();
+
+    let state = Arc::new(AppState {
+        client: Mutex::new(None),
+        cache: Mutex::new(None),
+        player: Mutex::new(audio::Player::new()),
+        media_controls: Mutex::new(MediaControlManager::new()),
+    });
+
+    let state_for_setup = state.clone();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .manage(state)
+        .setup(move |_app| {
+            let state = state_for_setup;
+
+            state.media_controls.lock().attach_handler({
+                let state = state.clone();
+                move |event| {
+                    match event {
+                        MediaControlEvent::Toggle => {
+                            let is_playing = state.player.lock().is_playing();
+                            if is_playing {
+                                state.player.lock().pause();
+                                state.media_controls.lock().set_paused();
+                            } else {
+                                state.player.lock().resume();
+                                state.media_controls.lock().set_playing();
+                            }
+                        }
+                        MediaControlEvent::Play => {
+                            state.player.lock().resume();
+                            state.media_controls.lock().set_playing();
+                        }
+                        MediaControlEvent::Pause => {
+                            state.player.lock().pause();
+                            state.media_controls.lock().set_paused();
+                        }
+                        MediaControlEvent::Next => {
+                            let state = state.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let next_track = {
+                                    state.player.lock().queue_mut().next().cloned()
+                                };
+                                if let Some(track) = next_track {
+                                    let client = state.client.lock().clone();
+                                    if let Some(client) = client {
+                                        if let Ok(data) =
+                                            client.download_stream(&track.id).await
+                                        {
+                                            let cover_url = track
+                                                .cover_art
+                                                .as_deref()
+                                                .map(|id| client.cover_art_url(id, Some(300)));
+                                            let mut player = state.player.lock();
+                                            let _ = player.play_bytes(data, track.clone());
+                                            drop(player);
+                                            let mut mc = state.media_controls.lock();
+                                            mc.set_metadata(
+                                                &track.title,
+                                                track.artist.as_deref().unwrap_or("Unknown"),
+                                                track.album.as_deref().unwrap_or(""),
+                                                track.duration.map(|d| d as f64),
+                                                cover_url.as_deref(),
+                                            );
+                                            mc.set_playing();
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        MediaControlEvent::Previous => {
+                            let state = state.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let prev_track = {
+                                    state.player.lock().queue_mut().previous().cloned()
+                                };
+                                if let Some(track) = prev_track {
+                                    let client = state.client.lock().clone();
+                                    if let Some(client) = client {
+                                        if let Ok(data) =
+                                            client.download_stream(&track.id).await
+                                        {
+                                            let cover_url = track
+                                                .cover_art
+                                                .as_deref()
+                                                .map(|id| client.cover_art_url(id, Some(300)));
+                                            let mut player = state.player.lock();
+                                            let _ = player.play_bytes(data, track.clone());
+                                            drop(player);
+                                            let mut mc = state.media_controls.lock();
+                                            mc.set_metadata(
+                                                &track.title,
+                                                track.artist.as_deref().unwrap_or("Unknown"),
+                                                track.album.as_deref().unwrap_or(""),
+                                                track.duration.map(|d| d as f64),
+                                                cover_url.as_deref(),
+                                            );
+                                            mc.set_playing();
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        MediaControlEvent::Stop => {
+                            state.player.lock().stop();
+                            state.media_controls.lock().set_stopped();
+                        }
+                        _ => {}
+                    }
+                }
+            });
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::connect,
+            commands::get_artists,
+            commands::get_artist,
+            commands::get_album,
+            commands::get_album_list,
+            commands::search,
+            commands::stream_track,
+            commands::get_cover_art_url,
+            commands::fetch_cover_art,
+            commands::fetch_external_cover_art,
+            commands::set_rating,
+            commands::scrobble,
+            commands::play_track,
+            commands::play_track_in_context,
+            commands::pause,
+            commands::resume,
+            commands::stop,
+            commands::seek,
+            commands::set_volume,
+            commands::get_playback_state,
+            commands::play_next,
+            commands::play_previous,
+            commands::toggle_shuffle,
+            commands::toggle_repeat,
+            commands::add_to_queue,
+            commands::clear_queue,
+            commands::get_queue,
+            commands::get_cached_tracks_by_rating,
+            commands::sync_library,
+            commands::search_local,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
