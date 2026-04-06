@@ -18,6 +18,13 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 html, body, #root {
@@ -58,7 +65,6 @@ input, button {
 
   .row-hover {
     transition: background-color 150ms ease;
-    user-select: none;
   }
   .row-hover:hover {
     background: var(--bg-hover);
@@ -67,7 +73,6 @@ input, button {
   .nav-item {
     transition: background-color 120ms ease, color 120ms ease;
     color: var(--text-secondary);
-    user-select: none;
   }
   .nav-item:hover {
     background: var(--bg-hover);
@@ -90,7 +95,6 @@ input, button {
   .track-row {
     transition: background-color 150ms ease;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-    user-select: none;
   }
   .track-row:hover {
     background: var(--bg-hover);

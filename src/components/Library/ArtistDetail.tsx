@@ -70,6 +70,7 @@ function AlbumSection({
   onPlayTrack: (songs: Song[], index: number) => void;
   onRate: (trackId: string, rating: number) => void;
 }) {
+  const { currentTrack, isPlaying } = usePlayerStore();
   const songs = album.song ?? [];
 
   return (
@@ -101,11 +102,17 @@ function AlbumSection({
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => onPlayTrack(songs, i)}
           >
-            <span className="w-8 text-right text-[11px] tabular-nums text-themed-muted">
-              {song.track ?? i + 1}
+            <span className="w-8 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
+              {currentTrack?.id === song.id ? (
+                <span className="eq-bars" data-paused={!isPlaying}>
+                  <span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" />
+                </span>
+              ) : (
+                song.track ?? i + 1
+              )}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] truncate text-themed-primary">
+              <p className={`text-[13px] truncate ${currentTrack?.id === song.id ? '' : 'text-themed-primary'}`} style={currentTrack?.id === song.id ? { color: 'var(--accent)' } : undefined}>
                 {song.title}
               </p>
             </div>

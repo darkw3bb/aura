@@ -39,7 +39,7 @@ export function RatedTracks() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
-  const { playTrackInContext, setRating } = usePlayerStore();
+  const { playTrackInContext, setRating, currentTrack, isPlaying } = usePlayerStore();
   const { loadArtist, loadAlbum } = useLibraryStore();
 
   const loadMore = useCallback(async () => {
@@ -160,10 +160,16 @@ export function RatedTracks() {
                 className="track-row flex items-center gap-3 px-6 cursor-pointer"
                 onDoubleClick={() => playTrackInContext(tracks.map(flatSongToSong), virtualRow.index)}
               >
-                <span className="w-10 text-right text-[11px] tabular-nums text-themed-muted">
-                  {virtualRow.index + 1}
+                <span className="w-10 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
+                  {currentTrack?.id === track.id ? (
+                    <span className="eq-bars" data-paused={!isPlaying}>
+                      <span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" />
+                    </span>
+                  ) : (
+                    virtualRow.index + 1
+                  )}
                 </span>
-                <span className="flex-1 min-w-0 text-[13px] truncate text-themed-primary">
+                <span className={`flex-1 min-w-0 text-[13px] truncate ${currentTrack?.id === track.id ? '' : 'text-themed-primary'}`} style={currentTrack?.id === track.id ? { color: 'var(--accent)' } : undefined}>
                   {track.title}
                 </span>
                 <span className="w-36 min-w-0 text-[13px] truncate text-themed-secondary">
