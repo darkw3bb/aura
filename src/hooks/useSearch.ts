@@ -55,11 +55,15 @@ export function useSearch() {
           }));
         }
 
-        setResults({
-          artists: serverResult?.artist ?? [],
-          albums: serverResult?.album ?? [],
-          songs,
-        });
+        const albums = (serverResult?.album ?? []).filter(
+          (a) => !a.artist || a.artist.toLowerCase() !== 'various artists',
+        );
+
+        const artists = (serverResult?.artist ?? []).filter(
+          (a) => !a.name.includes(' & '),
+        );
+
+        setResults({ artists, albums, songs });
       } catch {
         setResults(emptyResults);
       } finally {
