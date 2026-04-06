@@ -1,10 +1,13 @@
 pub mod queue;
+pub mod streaming;
 
 use parking_lot::Mutex as PLMutex;
 use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player as RodioPlayer};
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use self::streaming::StreamingBuffer;
 
 use self::queue::PlayQueue;
 use crate::subsonic::models::Song;
@@ -63,6 +66,40 @@ impl Player {
         let cursor = Cursor::new(data);
         let source =
             Decoder::new(cursor).map_err(|e| format!("Failed to decode audio: {}", e))?;
+
+        player.set_volume(self.volume);
+        player.append(source);
+
+        self.track_duration = track.duration.map(|d| Duration::from_secs(d as u64));
+        self.current_track = Some(track);
+        self.rodio_player = Some(player);
+        self.playback_start = Some(Instant::now());
+        self.paused_elapsed = Duration::ZERO;
+        self.is_playing = true;
+
+        Ok(())
+    }
+
+    /// Start playback from a `StreamingBuffer` that is being filled by a
+    /// background download task. Blocks only until symphonia has read enough
+    /// header bytes to begin decoding (typically < 100 ms).
+    pub fn play_stream(
+        &mut self,
+        buffer: StreamingBuffer,
+        track: Song,
+    ) -> Result<(), String> {
+        self.stop();
+        self.reinit_device()?;
+
+        let device_sink = self
+            .device_sink
+            .as_ref()
+            .ok_or("No audio output available")?;
+
+        let player = RodioPlayer::connect_new(device_sink.mixer());
+
+        let source =
+            Decoder::new(buffer).map_err(|e| format!("Failed to decode audio: {}", e))?;
 
         player.set_volume(self.volume);
         player.append(source);

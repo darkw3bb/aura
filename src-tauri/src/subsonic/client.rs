@@ -190,6 +190,20 @@ impl SubsonicClient {
         Ok(())
     }
 
+    /// Begin streaming an audio track. Returns the HTTP `Response` as soon
+    /// as headers arrive so the caller can consume the body incrementally.
+    pub async fn start_stream(&self, id: &str) -> Result<reqwest::Response, String> {
+        let mut query = self.auth_params();
+        query.insert("id".to_string(), id.to_string());
+
+        self.http
+            .get(&format!("{}/rest/stream", self.base_url))
+            .query(&query)
+            .send()
+            .await
+            .map_err(|e| format!("Stream error: {}", e))
+    }
+
     pub async fn download_stream(&self, id: &str) -> Result<bytes::Bytes, String> {
         let params = self.auth_params();
         let mut query = params;

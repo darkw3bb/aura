@@ -4,12 +4,60 @@ mod commands;
 mod media_controls;
 mod subsonic;
 
+use audio::streaming::StreamingBuffer;
 use cache::CacheDb;
+use futures_util::StreamExt;
 use media_controls::MediaControlManager;
 use parking_lot::Mutex;
 use souvlaki::MediaControlEvent;
 use std::sync::Arc;
 use subsonic::client::SubsonicClient;
+use subsonic::models::Song;
+
+/// Shared helper for media-key handlers: stream a track and start playback.
+async fn stream_and_play_bg(
+    state: &Arc<AppState>,
+    client: &SubsonicClient,
+    track: &Song,
+) -> Result<(), String> {
+    let resp = client.start_stream(&track.id).await?;
+    let (buffer, writer) = StreamingBuffer::new();
+
+    let mut byte_stream = resp.bytes_stream();
+    tokio::spawn(async move {
+        while let Some(chunk) = byte_stream.next().await {
+            match chunk {
+                Ok(data) => {
+                    if !writer.write_chunk(&data) {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        writer.finish();
+    });
+
+    let mut player = state.player.lock();
+    player.play_stream(buffer, track.clone())?;
+    drop(player);
+
+    let cover_url = track
+        .cover_art
+        .as_deref()
+        .map(|id| client.cover_art_url(id, Some(300)));
+    let mut mc = state.media_controls.lock();
+    mc.set_metadata(
+        &track.title,
+        track.artist.as_deref().unwrap_or("Unknown"),
+        track.album.as_deref().unwrap_or(""),
+        track.duration.map(|d| d as f64),
+        cover_url.as_deref(),
+    );
+    mc.set_playing();
+
+    Ok(())
+}
 
 pub struct AppState {
     pub client: Mutex<Option<SubsonicClient>>,
@@ -68,26 +116,7 @@ pub fn run() {
                                 if let Some(track) = next_track {
                                     let client = state.client.lock().clone();
                                     if let Some(client) = client {
-                                        if let Ok(data) =
-                                            client.download_stream(&track.id).await
-                                        {
-                                            let cover_url = track
-                                                .cover_art
-                                                .as_deref()
-                                                .map(|id| client.cover_art_url(id, Some(300)));
-                                            let mut player = state.player.lock();
-                                            let _ = player.play_bytes(data, track.clone());
-                                            drop(player);
-                                            let mut mc = state.media_controls.lock();
-                                            mc.set_metadata(
-                                                &track.title,
-                                                track.artist.as_deref().unwrap_or("Unknown"),
-                                                track.album.as_deref().unwrap_or(""),
-                                                track.duration.map(|d| d as f64),
-                                                cover_url.as_deref(),
-                                            );
-                                            mc.set_playing();
-                                        }
+                                        let _ = stream_and_play_bg(&state, &client, &track).await;
                                     }
                                 }
                             });
@@ -101,26 +130,7 @@ pub fn run() {
                                 if let Some(track) = prev_track {
                                     let client = state.client.lock().clone();
                                     if let Some(client) = client {
-                                        if let Ok(data) =
-                                            client.download_stream(&track.id).await
-                                        {
-                                            let cover_url = track
-                                                .cover_art
-                                                .as_deref()
-                                                .map(|id| client.cover_art_url(id, Some(300)));
-                                            let mut player = state.player.lock();
-                                            let _ = player.play_bytes(data, track.clone());
-                                            drop(player);
-                                            let mut mc = state.media_controls.lock();
-                                            mc.set_metadata(
-                                                &track.title,
-                                                track.artist.as_deref().unwrap_or("Unknown"),
-                                                track.album.as_deref().unwrap_or(""),
-                                                track.duration.map(|d| d as f64),
-                                                cover_url.as_deref(),
-                                            );
-                                            mc.set_playing();
-                                        }
+                                        let _ = stream_and_play_bg(&state, &client, &track).await;
                                     }
                                 }
                             });

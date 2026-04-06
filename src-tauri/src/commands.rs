@@ -1,8 +1,10 @@
 use base64::Engine;
+use crate::audio::streaming::StreamingBuffer;
 use crate::cache::CacheDb;
 use crate::subsonic::client::SubsonicClient;
 use crate::subsonic::models::*;
 use crate::AppState;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -227,15 +229,34 @@ pub async fn scrobble(
 
 // -- Playback commands --
 
-#[tauri::command]
-pub async fn play_track(
-    state: tauri::State<'_, Arc<AppState>>,
-    track: Song,
+/// Start streaming a track: create a `StreamingBuffer`, spawn a background
+/// download task, then hand the buffer to the player so decoding begins
+/// as soon as the first bytes arrive.
+async fn stream_and_play(
+    state: &Arc<AppState>,
+    client: &SubsonicClient,
+    track: &Song,
 ) -> Result<(), String> {
-    let client = state.client.lock().clone().ok_or("Not connected")?;
-    let data = client.download_stream(&track.id).await?;
+    let resp = client.start_stream(&track.id).await?;
+    let (buffer, writer) = StreamingBuffer::new();
+
+    let mut byte_stream = resp.bytes_stream();
+    tokio::spawn(async move {
+        while let Some(chunk) = byte_stream.next().await {
+            match chunk {
+                Ok(data) => {
+                    if !writer.write_chunk(&data) {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        writer.finish();
+    });
+
     let mut player = state.player.lock();
-    player.play_bytes(data, track.clone())?;
+    player.play_stream(buffer, track.clone())?;
     drop(player);
 
     let cover_url = track
@@ -251,7 +272,17 @@ pub async fn play_track(
         cover_url.as_deref(),
     );
     mc.set_playing();
+
     Ok(())
+}
+
+#[tauri::command]
+pub async fn play_track(
+    state: tauri::State<'_, Arc<AppState>>,
+    track: Song,
+) -> Result<(), String> {
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    stream_and_play(&state, &client, &track).await
 }
 
 #[tauri::command]
@@ -272,25 +303,7 @@ pub async fn play_track_in_context(
         player.queue_mut().set_tracks_at(tracks, index);
     }
 
-    let data = client.download_stream(&track.id).await?;
-    let mut player = state.player.lock();
-    player.play_bytes(data, track.clone())?;
-    drop(player);
-
-    let cover_url = track
-        .cover_art
-        .as_deref()
-        .map(|id| client.cover_art_url(id, Some(300)));
-    let mut mc = state.media_controls.lock();
-    mc.set_metadata(
-        &track.title,
-        track.artist.as_deref().unwrap_or("Unknown"),
-        track.album.as_deref().unwrap_or(""),
-        track.duration.map(|d| d as f64),
-        cover_url.as_deref(),
-    );
-    mc.set_playing();
-    Ok(())
+    stream_and_play(&state, &client, &track).await
 }
 
 #[tauri::command]
@@ -362,24 +375,7 @@ pub async fn play_next(state: tauri::State<'_, Arc<AppState>>) -> Result<Option<
 
     if let Some(ref track) = next_track {
         let client = state.client.lock().clone().ok_or("Not connected")?;
-        let data = client.download_stream(&track.id).await?;
-        let mut player = state.player.lock();
-        player.play_bytes(data, track.clone())?;
-        drop(player);
-
-        let cover_url = track
-            .cover_art
-            .as_deref()
-            .map(|id| client.cover_art_url(id, Some(300)));
-        let mut mc = state.media_controls.lock();
-        mc.set_metadata(
-            &track.title,
-            track.artist.as_deref().unwrap_or("Unknown"),
-            track.album.as_deref().unwrap_or(""),
-            track.duration.map(|d| d as f64),
-            cover_url.as_deref(),
-        );
-        mc.set_playing();
+        stream_and_play(&state, &client, track).await?;
     }
 
     Ok(next_track)
@@ -396,24 +392,7 @@ pub async fn play_previous(
 
     if let Some(ref track) = prev_track {
         let client = state.client.lock().clone().ok_or("Not connected")?;
-        let data = client.download_stream(&track.id).await?;
-        let mut player = state.player.lock();
-        player.play_bytes(data, track.clone())?;
-        drop(player);
-
-        let cover_url = track
-            .cover_art
-            .as_deref()
-            .map(|id| client.cover_art_url(id, Some(300)));
-        let mut mc = state.media_controls.lock();
-        mc.set_metadata(
-            &track.title,
-            track.artist.as_deref().unwrap_or("Unknown"),
-            track.album.as_deref().unwrap_or(""),
-            track.duration.map(|d| d as f64),
-            cover_url.as_deref(),
-        );
-        mc.set_playing();
+        stream_and_play(&state, &client, track).await?;
     }
 
     Ok(prev_track)
