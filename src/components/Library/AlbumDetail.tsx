@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useContextMenuStore } from '../../stores/contextMenuStore';
 import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
@@ -15,7 +16,8 @@ function formatDuration(secs?: number): string {
 
 export function AlbumDetail() {
   const { selectedAlbum, goBack, loadArtist, updateAlbumRating } = useLibraryStore();
-  const { playTrackInContext, setRating, currentTrack, isPlaying } = usePlayerStore();
+  const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
+  const showContextMenu = useContextMenuStore((s) => s.show);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleAlbumRating = async (rating: number) => {
@@ -105,6 +107,13 @@ export function AlbumDetail() {
             key={song.id}
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => playTrackInContext(songs, i)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              showContextMenu(e.clientX, e.clientY, [
+                { label: 'Play Next', onClick: () => insertNextInQueue(song) },
+                { label: 'Add to Queue', onClick: () => addToQueue(song) },
+              ]);
+            }}
             {...getItemProps(i)}
           >
             <span className="w-8 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">

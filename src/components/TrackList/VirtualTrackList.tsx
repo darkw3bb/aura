@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { FlatSong, Song } from '../../lib/tauri';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../stores/libraryStore';
+import { useContextMenuStore } from '../../stores/contextMenuStore';
 import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { StarRating } from '../Rating/StarRating';
 
@@ -54,6 +55,7 @@ interface TrackRowProps {
   onArtistClick: (artistId: string) => void;
   onAlbumClick: (albumId: string) => void;
   onMouseEnter: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }
 
 const TrackRow = memo(function TrackRow({
@@ -70,6 +72,7 @@ const TrackRow = memo(function TrackRow({
   onArtistClick,
   onAlbumClick,
   onMouseEnter,
+  onContextMenu,
 }: TrackRowProps) {
   return (
     <div
@@ -86,6 +89,7 @@ const TrackRow = memo(function TrackRow({
       data-focused={focused}
       onDoubleClick={() => onPlay(index)}
       onMouseEnter={onMouseEnter}
+      onContextMenu={onContextMenu}
     >
       <span className="w-10 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
         {isCurrentTrack ? (
@@ -188,8 +192,9 @@ export function VirtualTrackList({
   const tracksCountRef = useRef(0);
   tracksCountRef.current = tracks.length;
 
-  const { playTrackInContext, setRating, currentTrack, isPlaying } = usePlayerStore();
+  const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
   const { loadArtist, loadAlbum } = useLibraryStore();
+  const showContextMenu = useContextMenuStore((s) => s.show);
 
   // Stable loadMore — all mutable values accessed via refs
   const loadMore = useCallback(async () => {
@@ -378,6 +383,16 @@ export function VirtualTrackList({
                 onArtistClick={loadArtist}
                 onAlbumClick={loadAlbum}
                 onMouseEnter={itemProps.onMouseEnter}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  const song = songsRef.current[virtualRow.index];
+                  if (song) {
+                    showContextMenu(e.clientX, e.clientY, [
+                      { label: 'Play Next', onClick: () => insertNextInQueue(song) },
+                      { label: 'Add to Queue', onClick: () => addToQueue(song) },
+                    ]);
+                  }
+                }}
               />
             );
           })}

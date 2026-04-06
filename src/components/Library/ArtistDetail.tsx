@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useContextMenuStore } from '../../stores/contextMenuStore';
 import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
@@ -16,7 +17,8 @@ function formatDuration(secs?: number): string {
 
 export function ArtistDetail() {
   const { selectedArtist, artistAlbums, goBack, updateAlbumRating } = useLibraryStore();
-  const { playTrackInContext, setRating } = usePlayerStore();
+  const { playTrackInContext, setRating, addToQueue, insertNextInQueue } = usePlayerStore();
+  const showContextMenu = useContextMenuStore((s) => s.show);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const allSongs = artistAlbums.flatMap((a) => a.song ?? []);
@@ -85,6 +87,13 @@ export function ArtistDetail() {
               onPlayTrack={(songs, index) => playTrackInContext(songs, index)}
               onRate={(id, r) => setRating(id, r)}
               onAlbumRate={(r) => handleAlbumRating(album.id, r)}
+              onContextMenu={(song, e) => {
+                e.preventDefault();
+                showContextMenu(e.clientX, e.clientY, [
+                  { label: 'Play Next', onClick: () => insertNextInQueue(song) },
+                  { label: 'Add to Queue', onClick: () => addToQueue(song) },
+                ]);
+              }}
             />
           );
         })}
@@ -100,6 +109,7 @@ function AlbumSection({
   onPlayTrack,
   onRate,
   onAlbumRate,
+  onContextMenu,
 }: {
   album: AlbumDetail;
   flatOffset: number;
@@ -107,6 +117,7 @@ function AlbumSection({
   onPlayTrack: (songs: Song[], index: number) => void;
   onRate: (trackId: string, rating: number) => void;
   onAlbumRate: (rating: number) => void;
+  onContextMenu: (song: Song, e: React.MouseEvent) => void;
 }) {
   const { currentTrack, isPlaying } = usePlayerStore();
   const { loadArtist } = useLibraryStore();
@@ -147,6 +158,7 @@ function AlbumSection({
             key={song.id}
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => onPlayTrack(songs, i)}
+            onContextMenu={(e) => onContextMenu(song, e)}
             {...getItemProps(flatOffset + i)}
           >
             <span className="w-8 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">

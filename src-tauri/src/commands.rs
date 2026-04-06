@@ -26,9 +26,11 @@ pub struct PlaybackState {
     pub volume: f32,
     pub shuffle: bool,
     pub repeat: String,
+    pub finished: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QueueInfo {
     pub tracks: Vec<Song>,
     pub current_index: Option<usize>,
@@ -420,6 +422,7 @@ pub async fn get_playback_state(
         volume: player.volume(),
         shuffle: player.queue().is_shuffle(),
         repeat: repeat.to_string(),
+        finished: player.is_finished() && player.current_track().is_some(),
     })
 }
 
@@ -488,9 +491,58 @@ pub async fn clear_queue(state: tauri::State<'_, Arc<AppState>>) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn get_queue(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<Song>, String> {
+pub async fn get_queue(state: tauri::State<'_, Arc<AppState>>) -> Result<QueueInfo, String> {
     let player = state.player.lock();
-    Ok(player.queue().tracks().to_vec())
+    Ok(QueueInfo {
+        tracks: player.queue().tracks().to_vec(),
+        current_index: player.queue().get_current_index(),
+    })
+}
+
+#[tauri::command]
+pub async fn insert_next_in_queue(
+    state: tauri::State<'_, Arc<AppState>>,
+    track: Song,
+) -> Result<(), String> {
+    state.player.lock().queue_mut().insert_after_current(track);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn move_in_queue(
+    state: tauri::State<'_, Arc<AppState>>,
+    from: usize,
+    to: usize,
+) -> Result<(), String> {
+    state.player.lock().queue_mut().move_track(from, to);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_from_queue(
+    state: tauri::State<'_, Arc<AppState>>,
+    index: usize,
+) -> Result<(), String> {
+    state.player.lock().queue_mut().remove_track(index);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn jump_to_in_queue(
+    state: tauri::State<'_, Arc<AppState>>,
+    index: usize,
+) -> Result<Option<Song>, String> {
+    let track = {
+        let mut player = state.player.lock();
+        player.queue_mut().jump_to(index).cloned()
+    };
+
+    if let Some(ref track) = track {
+        let client = state.client.lock().clone().ok_or("Not connected")?;
+        stream_and_play(&state, &client, track).await?;
+    }
+
+    Ok(track)
 }
 
 // -- Cache / local search --

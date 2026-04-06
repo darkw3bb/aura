@@ -109,6 +109,12 @@ export interface PlaybackState {
   volume: number;
   shuffle: boolean;
   repeat: string;
+  finished: boolean;
+}
+
+export interface QueueInfo {
+  tracks: Song[];
+  currentIndex: number | null;
 }
 
 export const api = {
@@ -153,7 +159,11 @@ export const api = {
   toggleRepeat: () => invoke<string>('toggle_repeat'),
   addToQueue: (track: Song) => invoke<void>('add_to_queue', { track }),
   clearQueue: () => invoke<void>('clear_queue'),
-  getQueue: () => invoke<Song[]>('get_queue'),
+  getQueue: () => invoke<QueueInfo>('get_queue'),
+  insertNextInQueue: (track: Song) => invoke<void>('insert_next_in_queue', { track }),
+  moveInQueue: (from: number, to: number) => invoke<void>('move_in_queue', { from, to }),
+  removeFromQueue: (index: number) => invoke<void>('remove_from_queue', { index }),
+  jumpToInQueue: (index: number) => invoke<Song | null>('jump_to_in_queue', { index }),
 
   syncLibrary: () => invoke<string>('sync_library'),
   searchLocal: (query: string) => invoke<FlatSong[]>('search_local', { query }),

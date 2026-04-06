@@ -11,6 +11,8 @@ import { SearchOverlay } from './components/Search/SearchOverlay';
 import { RatedTracks } from './components/TrackList/RatedTracks';
 import { GenreList } from './components/Library/GenreList';
 import { GenreTracks } from './components/TrackList/GenreTracks';
+import { QueuePanel } from './components/Queue/QueuePanel';
+import { ContextMenu } from './components/ContextMenu/ContextMenu';
 
 function App() {
   const { view, setView, connected, connect, canGoBack, canGoForward, goBack, goForward } = useLibraryStore();
@@ -148,6 +150,23 @@ function App() {
                 </NavButton>
 
                 <NavButton
+                  active={view === 'queue'}
+                  onClick={() => setView('queue')}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="8" y1="6" x2="21" y2="6" />
+                      <line x1="8" y1="12" x2="21" y2="12" />
+                      <line x1="8" y1="18" x2="21" y2="18" />
+                      <line x1="3" y1="6" x2="3.01" y2="6" />
+                      <line x1="3" y1="12" x2="3.01" y2="12" />
+                      <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>
+                  }
+                >
+                  Queue
+                </NavButton>
+
+                <NavButton
                   active={view === 'settings'}
                   onClick={() => setView('settings')}
                   icon={
@@ -203,6 +222,7 @@ function App() {
             {view === 'rated' && <RatedTracks />}
             {view === 'genres' && <GenreList />}
             {view === 'genre-detail' && <GenreTracks />}
+            {view === 'queue' && <QueuePanel />}
             {view === 'artists' && (
               <div className="p-6">
                 <h2 className="text-xl font-bold text-themed-primary">
@@ -217,6 +237,7 @@ function App() {
       {connected && <PlayerBar />}
 
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <ContextMenu />
     </div>
   );
 }

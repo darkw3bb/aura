@@ -151,6 +151,67 @@ impl PlayQueue {
         self.repeat.clone()
     }
 
+    pub fn insert_after_current(&mut self, track: Song) {
+        let insert_pos = match self.current_index {
+            Some(idx) => idx + 1,
+            None => 0,
+        };
+        self.tracks.insert(insert_pos, track);
+        if self.current_index.is_none() {
+            self.current_index = Some(0);
+        }
+        self.rebuild_shuffle_order();
+    }
+
+    pub fn move_track(&mut self, from: usize, to: usize) {
+        if from >= self.tracks.len() || to >= self.tracks.len() || from == to {
+            return;
+        }
+        let track = self.tracks.remove(from);
+        self.tracks.insert(to, track);
+
+        if let Some(idx) = self.current_index {
+            if from == idx {
+                self.current_index = Some(to);
+            } else if from < idx && to >= idx {
+                self.current_index = Some(idx - 1);
+            } else if from > idx && to <= idx {
+                self.current_index = Some(idx + 1);
+            }
+        }
+        self.rebuild_shuffle_order();
+    }
+
+    pub fn remove_track(&mut self, index: usize) -> Option<Song> {
+        if index >= self.tracks.len() {
+            return None;
+        }
+        let removed = self.tracks.remove(index);
+        if self.tracks.is_empty() {
+            self.current_index = None;
+        } else if let Some(idx) = self.current_index {
+            if index < idx {
+                self.current_index = Some(idx - 1);
+            } else if index == idx && idx >= self.tracks.len() {
+                self.current_index = Some(self.tracks.len() - 1);
+            }
+        }
+        self.rebuild_shuffle_order();
+        Some(removed)
+    }
+
+    pub fn jump_to(&mut self, index: usize) -> Option<&Song> {
+        if index >= self.tracks.len() {
+            return None;
+        }
+        self.current_index = Some(index);
+        self.tracks.get(index)
+    }
+
+    pub fn get_current_index(&self) -> Option<usize> {
+        self.current_index
+    }
+
     pub fn tracks(&self) -> &[Song] {
         &self.tracks
     }

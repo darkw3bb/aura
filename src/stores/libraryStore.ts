@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { api } from '../lib/tauri';
 import type { Artist, Album, AlbumDetail, ArtistDetail } from '../lib/tauri';
 
-type View = 'albums' | 'artists' | 'artist-detail' | 'album-detail' | 'rated' | 'genres' | 'genre-detail' | 'settings';
+type View = 'albums' | 'artists' | 'artist-detail' | 'album-detail' | 'rated' | 'genres' | 'genre-detail' | 'queue' | 'settings';
 
 interface NavEntry {
   view: View;
