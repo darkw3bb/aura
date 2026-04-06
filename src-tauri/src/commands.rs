@@ -268,6 +268,7 @@ pub async fn set_rating(
     let cache = state.cache.lock();
     if let Some(ref cache) = *cache {
         cache.update_track_rating(&id, rating)?;
+        cache.update_album_rating(&id, rating)?;
     }
 
     state.player.lock().update_track_rating(&id, rating);

@@ -41,7 +41,8 @@ impl CacheDb {
                 song_count INTEGER,
                 duration INTEGER,
                 year INTEGER,
-                genre TEXT
+                genre TEXT,
+                user_rating INTEGER DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS tracks (
                 id TEXT PRIMARY KEY,
@@ -81,6 +82,11 @@ impl CacheDb {
             ",
             )
             .map_err(|e| format!("Schema error: {}", e))?;
+
+        // Migrate existing databases: add user_rating to albums if missing
+        self.conn
+            .execute_batch("ALTER TABLE albums ADD COLUMN user_rating INTEGER DEFAULT 0")
+            .ok();
 
         // Rebuild FTS indexes so existing caches get populated
         self.conn
@@ -124,8 +130,23 @@ impl CacheDb {
     pub fn upsert_album(&self, a: &Album) -> Result<(), String> {
         self.conn
             .execute(
-                "INSERT OR REPLACE INTO albums (id, name, artist, artist_id, cover_art, song_count, duration, year, genre) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                params![a.id, a.name, a.artist, a.artist_id, a.cover_art, a.song_count, a.duration, a.year, a.genre],
+                "INSERT INTO albums (id, name, artist, artist_id, cover_art, song_count, duration, year, genre, user_rating)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                 ON CONFLICT(id) DO UPDATE SET
+                   name = excluded.name,
+                   artist = excluded.artist,
+                   artist_id = excluded.artist_id,
+                   cover_art = excluded.cover_art,
+                   song_count = excluded.song_count,
+                   duration = excluded.duration,
+                   year = excluded.year,
+                   genre = excluded.genre,
+                   user_rating = CASE
+                     WHEN excluded.user_rating IS NOT NULL AND excluded.user_rating > 0
+                     THEN excluded.user_rating
+                     ELSE albums.user_rating
+                   END",
+                params![a.id, a.name, a.artist, a.artist_id, a.cover_art, a.song_count, a.duration, a.year, a.genre, a.user_rating],
             )
             .map_err(|e| format!("Insert album error: {}", e))?;
 
@@ -247,7 +268,7 @@ impl CacheDb {
             .conn
             .prepare(
                 "SELECT a.id, a.name, a.artist, a.artist_id, a.cover_art,
-                        a.song_count, a.duration, a.year, a.genre
+                        a.song_count, a.duration, a.year, a.genre, a.user_rating
                  FROM albums_fts fts
                  JOIN albums a ON a.rowid = fts.rowid
                  WHERE albums_fts MATCH ?1
@@ -269,7 +290,7 @@ impl CacheDb {
                     year: row.get(7)?,
                     genre: row.get(8)?,
                     created: None,
-                    user_rating: None,
+                    user_rating: row.get(9)?,
                 })
             })
             .map_err(|e| format!("Album search query error: {}", e))?;
@@ -402,7 +423,7 @@ impl CacheDb {
         let mut album_stmt = self
             .conn
             .prepare(
-                "SELECT id, name, artist, artist_id, cover_art, song_count, duration, year, genre
+                "SELECT id, name, artist, artist_id, cover_art, song_count, duration, year, genre, user_rating
                  FROM albums WHERE artist_id = ?1
                  ORDER BY year, name",
             )
@@ -421,7 +442,7 @@ impl CacheDb {
                     year: row.get(7)?,
                     genre: row.get(8)?,
                     created: None,
-                    user_rating: None,
+                    user_rating: row.get(9)?,
                 })
             })
             .map_err(|e| format!("Query error: {}", e))?;
@@ -438,7 +459,7 @@ impl CacheDb {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT id, name, artist, artist_id, cover_art, song_count, duration, year, genre
+                "SELECT id, name, artist, artist_id, cover_art, song_count, duration, year, genre, user_rating
                  FROM albums WHERE id = ?1",
             )
             .map_err(|e| format!("Prepare error: {}", e))?;
@@ -456,7 +477,7 @@ impl CacheDb {
                     year: row.get(7)?,
                     genre: row.get(8)?,
                     song: None,
-                    user_rating: None,
+                    user_rating: row.get(9)?,
                 })
             })
             .optional()
@@ -594,6 +615,16 @@ impl CacheDb {
                 params![rating, track_id],
             )
             .map_err(|e| format!("Update rating error: {}", e))?;
+        Ok(())
+    }
+
+    pub fn update_album_rating(&self, album_id: &str, rating: i32) -> Result<(), String> {
+        self.conn
+            .execute(
+                "UPDATE albums SET user_rating = ?1 WHERE id = ?2",
+                params![rating, album_id],
+            )
+            .map_err(|e| format!("Update album rating error: {}", e))?;
         Ok(())
     }
 }
