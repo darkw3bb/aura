@@ -71,6 +71,7 @@ function AlbumSection({
   onRate: (trackId: string, rating: number) => void;
 }) {
   const { currentTrack, isPlaying } = usePlayerStore();
+  const { loadArtist } = useLibraryStore();
   const songs = album.song ?? [];
 
   return (
@@ -116,6 +117,19 @@ function AlbumSection({
                 {song.title}
               </p>
             </div>
+            <span className="w-36 min-w-0 text-[13px] truncate text-themed-secondary">
+              {song.artist_id ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); loadArtist(song.artist_id!); }}
+                  className="bg-transparent border-0 p-0 cursor-pointer text-themed-secondary hover:underline text-[13px] truncate max-w-full text-left"
+                >
+                  {song.artist ?? 'Unknown'}
+                </button>
+              ) : (song.artist ?? 'Unknown')}
+            </span>
+            <span className="text-[11px] tabular-nums w-14 text-right text-themed-muted">
+              {song.bit_rate ? `${song.bit_rate}k` : ''}
+            </span>
             <StarRating
               rating={song.user_rating ?? 0}
               onChange={(r) => onRate(song.id, r)}

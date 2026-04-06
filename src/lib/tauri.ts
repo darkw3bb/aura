@@ -74,6 +74,8 @@ export interface FlatSong {
   genre?: string;
   duration?: number;
   bit_rate?: number;
+  suffix?: string;
+  content_type?: string;
   cover_art?: string;
   user_rating?: number;
   disc_number?: number;

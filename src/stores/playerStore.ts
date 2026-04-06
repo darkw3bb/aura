@@ -153,7 +153,11 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       const skipping = Date.now() < get()._skipRefreshUntil;
       set({
         isPlaying: skipping ? get().isPlaying : state.isPlaying,
-        currentTrack: skipping ? get().currentTrack : (state.currentTrack ?? get().currentTrack),
+        currentTrack: skipping
+          ? get().currentTrack
+          : state.currentTrack
+            ? { ...get().currentTrack, ...state.currentTrack }
+            : get().currentTrack,
         elapsedSecs: skipping ? get().elapsedSecs : state.elapsedSecs,
         durationSecs: state.durationSecs ?? null,
         volume: state.volume,

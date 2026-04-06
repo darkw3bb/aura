@@ -43,12 +43,14 @@ pub struct ArtistIndex {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Artist {
     pub id: String,
     pub name: String,
+    #[serde(alias = "albumCount")]
     pub album_count: Option<i32>,
+    #[serde(alias = "coverArt")]
     pub cover_art: Option<String>,
+    #[serde(alias = "artistImageUrl")]
     pub artist_image_url: Option<String>,
 }
 
@@ -62,11 +64,12 @@ pub struct ArtistBody {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ArtistDetail {
     pub id: String,
     pub name: String,
+    #[serde(alias = "albumCount")]
     pub album_count: Option<i32>,
+    #[serde(alias = "coverArt")]
     pub cover_art: Option<String>,
     pub album: Option<Vec<Album>>,
 }
@@ -87,13 +90,15 @@ pub struct AlbumListContainer {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Album {
     pub id: String,
     pub name: String,
     pub artist: Option<String>,
+    #[serde(alias = "artistId")]
     pub artist_id: Option<String>,
+    #[serde(alias = "coverArt")]
     pub cover_art: Option<String>,
+    #[serde(alias = "songCount")]
     pub song_count: Option<i32>,
     pub duration: Option<i64>,
     pub year: Option<i32>,
@@ -112,13 +117,15 @@ pub struct AlbumBody {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct AlbumDetail {
     pub id: String,
     pub name: String,
     pub artist: Option<String>,
+    #[serde(alias = "artistId")]
     pub artist_id: Option<String>,
+    #[serde(alias = "coverArt")]
     pub cover_art: Option<String>,
+    #[serde(alias = "songCount")]
     pub song_count: Option<i32>,
     pub duration: Option<i64>,
     pub year: Option<i32>,
@@ -129,25 +136,31 @@ pub struct AlbumDetail {
 // -- Songs --
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Song {
     pub id: String,
     pub title: String,
     pub album: Option<String>,
+    #[serde(alias = "albumId")]
     pub album_id: Option<String>,
     pub artist: Option<String>,
+    #[serde(alias = "artistId")]
     pub artist_id: Option<String>,
     pub track: Option<i32>,
     pub year: Option<i32>,
     pub genre: Option<String>,
     pub size: Option<i64>,
+    #[serde(alias = "contentType")]
     pub content_type: Option<String>,
     pub suffix: Option<String>,
     pub duration: Option<i64>,
+    #[serde(alias = "bitRate")]
     pub bit_rate: Option<i32>,
     pub path: Option<String>,
+    #[serde(alias = "coverArt")]
     pub cover_art: Option<String>,
+    #[serde(alias = "userRating")]
     pub user_rating: Option<i32>,
+    #[serde(alias = "discNumber")]
     pub disc_number: Option<i32>,
 }
 

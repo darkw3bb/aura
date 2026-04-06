@@ -101,6 +101,9 @@ export function AlbumDetail() {
                 </p>
               )}
             </div>
+            <span className="text-[11px] tabular-nums w-14 text-right text-themed-muted">
+              {song.bit_rate ? `${song.bit_rate}k` : ''}
+            </span>
             <StarRating
               rating={song.user_rating ?? 0}
               onChange={(r) => setRating(song.id, r)}

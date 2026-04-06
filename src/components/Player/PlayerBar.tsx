@@ -28,11 +28,11 @@ export function PlayerBar() {
 
   return (
     <div
-      className="h-20 flex items-center px-4 gap-4 shrink-0 overflow-hidden"
+      className="h-20 flex items-center px-6 gap-4 shrink-0 overflow-hidden min-w-0"
       style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}
     >
       {/* Track info */}
-      <div className="flex items-center gap-3 w-72 min-w-0">
+      <div className="flex items-center gap-3 w-64 shrink-0 min-w-0">
         {currentTrack ? (
           <>
             <CoverArt coverArt={currentTrack.cover_art} artist={currentTrack.artist} albumName={currentTrack.album} size={100} className="w-12 h-12 rounded" />
@@ -56,7 +56,7 @@ export function PlayerBar() {
       </div>
 
       {/* Transport controls */}
-      <div className="flex-1 flex flex-col items-center gap-1">
+      <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
         <div className="flex items-center gap-4">
           <ControlButton
             active={shuffle}

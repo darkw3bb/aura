@@ -26,6 +26,8 @@ function flatSongToSong(f: FlatSong) {
     genre: f.genre,
     duration: f.duration,
     bit_rate: f.bit_rate,
+    suffix: f.suffix,
+    content_type: f.content_type,
     cover_art: f.cover_art,
     user_rating: f.user_rating,
     disc_number: f.disc_number,
@@ -113,6 +115,7 @@ export function RatedTracks() {
         <span className="flex-1 min-w-0">Title</span>
         <span className="w-36 min-w-0">Artist</span>
         <span className="w-36 min-w-0">Album</span>
+        <span className="w-14 text-right">kbps</span>
         <span className="w-24">Rating</span>
         <span className="w-14 text-right">Time</span>
       </div>
@@ -191,6 +194,9 @@ export function RatedTracks() {
                       {track.album ?? 'Unknown'}
                     </button>
                   ) : (track.album ?? 'Unknown')}
+                </span>
+                <span className="w-14 text-right text-[11px] tabular-nums text-themed-muted">
+                  {track.bit_rate ? `${track.bit_rate}k` : ''}
                 </span>
                 <span className="w-24">
                   <StarRating

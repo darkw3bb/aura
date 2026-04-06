@@ -50,8 +50,8 @@ function App() {
   }, [handleKeyDown]);
 
   return (
-    <div className="flex flex-col h-screen bg-themed-primary">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-col h-screen bg-themed-primary overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         {connected && (
           <div className="w-56 shrink-0 flex flex-col overflow-hidden bg-themed-secondary border-r border-themed">
             <div className="px-4 pt-6 pb-1">
@@ -145,7 +145,7 @@ function App() {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-w-0">
           {view === 'settings' && <Settings />}
           {view === 'albums' && <AlbumGrid />}
           {view === 'album-detail' && <AlbumDetail />}
