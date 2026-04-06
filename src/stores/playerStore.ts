@@ -11,6 +11,8 @@ interface PlayerStore {
   shuffle: boolean;
   repeat: string;
   queue: Song[];
+  /** Timestamp until which refreshState skips overwriting playback state (avoids clobbering optimistic updates). */
+  _skipRefreshUntil: number;
 
   playTrack: (track: Song) => Promise<void>;
   playTrackInContext: (tracks: Song[], index: number) => Promise<void>;
@@ -38,6 +40,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   shuffle: false,
   repeat: 'off',
   queue: [],
+  _skipRefreshUntil: 0,
 
   playTrack: async (track: Song) => {
     set({
@@ -45,6 +48,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       currentTrack: track,
       elapsedSecs: 0,
       durationSecs: track.duration ?? null,
+      _skipRefreshUntil: Date.now() + 2000,
     });
     try {
       await api.playTrack(track);
@@ -63,6 +67,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       elapsedSecs: 0,
       durationSecs: track.duration ?? null,
       queue: tracks,
+      _skipRefreshUntil: Date.now() + 2000,
     });
     try {
       await api.playTrackInContext(tracks, index);
@@ -73,18 +78,18 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   },
 
   pause: async () => {
-    set({ isPlaying: false });
+    set({ isPlaying: false, _skipRefreshUntil: Date.now() + 2000 });
     await api.pause();
   },
 
   resume: async () => {
-    set({ isPlaying: true });
+    set({ isPlaying: true, _skipRefreshUntil: Date.now() + 2000 });
     await api.resume();
   },
 
   stop: async () => {
     await api.stop();
-    set({ isPlaying: false, currentTrack: null, elapsedSecs: 0 });
+    set({ isPlaying: false, currentTrack: null, elapsedSecs: 0, _skipRefreshUntil: Date.now() + 2000 });
   },
 
   playNext: async () => {
@@ -145,10 +150,11 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   refreshState: async () => {
     try {
       const state: PlaybackState = await api.getPlaybackState();
+      const skipping = Date.now() < get()._skipRefreshUntil;
       set({
-        isPlaying: state.isPlaying,
-        currentTrack: state.currentTrack ?? get().currentTrack,
-        elapsedSecs: state.elapsedSecs,
+        isPlaying: skipping ? get().isPlaying : state.isPlaying,
+        currentTrack: skipping ? get().currentTrack : (state.currentTrack ?? get().currentTrack),
+        elapsedSecs: skipping ? get().elapsedSecs : state.elapsedSecs,
         durationSecs: state.durationSecs ?? null,
         volume: state.volume,
         shuffle: state.shuffle,
