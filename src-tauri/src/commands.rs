@@ -8,6 +8,14 @@ use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LocalSearchResult {
+    pub artists: Vec<Artist>,
+    pub albums: Vec<Album>,
+    pub songs: Vec<FlatSong>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlaybackState {
     pub is_playing: bool,
     pub current_track: Option<Song>,
@@ -488,6 +496,23 @@ pub async fn search_local(
     let cache = state.cache.lock();
     let cache = cache.as_ref().ok_or("Cache not initialized")?;
     cache.search_tracks(&query)
+}
+
+#[tauri::command]
+pub async fn search_all(
+    state: tauri::State<'_, Arc<AppState>>,
+    query: String,
+) -> Result<LocalSearchResult, String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    let artists = cache.search_artists(&query)?;
+    let albums = cache.search_albums(&query)?;
+    let songs = cache.search_tracks(&query)?;
+    Ok(LocalSearchResult {
+        artists,
+        albums,
+        songs,
+    })
 }
 
 #[tauri::command]

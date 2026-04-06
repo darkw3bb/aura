@@ -64,12 +64,33 @@ impl CacheDb {
                 content='tracks',
                 content_rowid='rowid'
             );
+            CREATE VIRTUAL TABLE IF NOT EXISTS artists_fts USING fts5(
+                name,
+                content='artists',
+                content_rowid='rowid'
+            );
+            CREATE VIRTUAL TABLE IF NOT EXISTS albums_fts USING fts5(
+                name, artist,
+                content='albums',
+                content_rowid='rowid'
+            );
             CREATE INDEX IF NOT EXISTS idx_tracks_rating ON tracks(user_rating DESC);
             CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist_id);
             ",
             )
             .map_err(|e| format!("Schema error: {}", e))?;
+
+        // Rebuild FTS indexes so existing caches get populated
+        self.conn
+            .execute_batch(
+                "
+            INSERT INTO artists_fts(artists_fts) VALUES('rebuild');
+            INSERT INTO albums_fts(albums_fts) VALUES('rebuild');
+            ",
+            )
+            .map_err(|e| format!("FTS rebuild error: {}", e))?;
+
         Ok(())
     }
 
@@ -80,6 +101,22 @@ impl CacheDb {
                 params![a.id, a.name, a.album_count, a.cover_art],
             )
             .map_err(|e| format!("Insert artist error: {}", e))?;
+
+        self.conn
+            .execute(
+                "DELETE FROM artists_fts WHERE rowid = (SELECT rowid FROM artists WHERE id = ?1)",
+                params![a.id],
+            )
+            .ok();
+
+        self.conn
+            .execute(
+                "INSERT INTO artists_fts (rowid, name)
+                 SELECT rowid, name FROM artists WHERE id = ?1",
+                params![a.id],
+            )
+            .map_err(|e| format!("Artist FTS update error: {}", e))?;
+
         Ok(())
     }
 
@@ -90,6 +127,22 @@ impl CacheDb {
                 params![a.id, a.name, a.artist, a.artist_id, a.cover_art, a.song_count, a.duration, a.year, a.genre],
             )
             .map_err(|e| format!("Insert album error: {}", e))?;
+
+        self.conn
+            .execute(
+                "DELETE FROM albums_fts WHERE rowid = (SELECT rowid FROM albums WHERE id = ?1)",
+                params![a.id],
+            )
+            .ok();
+
+        self.conn
+            .execute(
+                "INSERT INTO albums_fts (rowid, name, artist)
+                 SELECT rowid, name, artist FROM albums WHERE id = ?1",
+                params![a.id],
+            )
+            .map_err(|e| format!("Album FTS update error: {}", e))?;
+
         Ok(())
     }
 
@@ -123,6 +176,89 @@ impl CacheDb {
             .map_err(|e| format!("FTS update error: {}", e))?;
 
         Ok(())
+    }
+
+    pub fn search_artists(&self, query: &str) -> Result<Vec<Artist>, String> {
+        let fts_query = query
+            .split_whitespace()
+            .map(|w| format!("{}*", w))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT a.id, a.name, a.album_count, a.cover_art
+                 FROM artists_fts fts
+                 JOIN artists a ON a.rowid = fts.rowid
+                 WHERE artists_fts MATCH ?1
+                   AND a.name NOT LIKE '% & %'
+                 LIMIT 20",
+            )
+            .map_err(|e| format!("Artist search prepare error: {}", e))?;
+
+        let rows = stmt
+            .query_map(params![fts_query], |row| {
+                Ok(Artist {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    album_count: row.get(2)?,
+                    cover_art: row.get(3)?,
+                    artist_image_url: None,
+                })
+            })
+            .map_err(|e| format!("Artist search query error: {}", e))?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(|e| format!("Row error: {}", e))?);
+        }
+        Ok(results)
+    }
+
+    pub fn search_albums(&self, query: &str) -> Result<Vec<Album>, String> {
+        let fts_query = query
+            .split_whitespace()
+            .map(|w| format!("{}*", w))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT a.id, a.name, a.artist, a.artist_id, a.cover_art,
+                        a.song_count, a.duration, a.year, a.genre
+                 FROM albums_fts fts
+                 JOIN albums a ON a.rowid = fts.rowid
+                 WHERE albums_fts MATCH ?1
+                   AND (a.artist IS NULL OR LOWER(a.artist) != 'various artists')
+                 LIMIT 20",
+            )
+            .map_err(|e| format!("Album search prepare error: {}", e))?;
+
+        let rows = stmt
+            .query_map(params![fts_query], |row| {
+                Ok(Album {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    artist: row.get(2)?,
+                    artist_id: row.get(3)?,
+                    cover_art: row.get(4)?,
+                    song_count: row.get(5)?,
+                    duration: row.get(6)?,
+                    year: row.get(7)?,
+                    genre: row.get(8)?,
+                    created: None,
+                    user_rating: None,
+                })
+            })
+            .map_err(|e| format!("Album search query error: {}", e))?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(|e| format!("Row error: {}", e))?);
+        }
+        Ok(results)
     }
 
     pub fn search_tracks(&self, query: &str) -> Result<Vec<FlatSong>, String> {

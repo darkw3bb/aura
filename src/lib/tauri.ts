@@ -89,6 +89,12 @@ export interface SearchResult {
   song?: Song[];
 }
 
+export interface LocalSearchResult {
+  artists: Artist[];
+  albums: Album[];
+  songs: FlatSong[];
+}
+
 export interface PlaybackState {
   isPlaying: boolean;
   currentTrack?: Song;
@@ -142,6 +148,7 @@ export const api = {
 
   syncLibrary: () => invoke<string>('sync_library'),
   searchLocal: (query: string) => invoke<FlatSong[]>('search_local', { query }),
+  searchAll: (query: string) => invoke<LocalSearchResult>('search_all', { query }),
   getCachedTracksByRating: (offset?: number, limit?: number) =>
     invoke<FlatSong[]>('get_cached_tracks_by_rating', { offset, limit }),
 };

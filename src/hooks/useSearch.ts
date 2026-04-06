@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { api } from '../lib/tauri';
-import type { Artist, Album, Song, FlatSong } from '../lib/tauri';
+import type { Artist, Album, FlatSong } from '../lib/tauri';
 
 export interface SearchResults {
   artists: Artist[];
@@ -9,15 +9,6 @@ export interface SearchResults {
 }
 
 const emptyResults: SearchResults = { artists: [], albums: [], songs: [] };
-
-function mapServerSong(s: Song): FlatSong {
-  return {
-    id: s.id, title: s.title, album: s.album, album_id: s.album_id,
-    artist: s.artist, artist_id: s.artist_id, track: s.track, year: s.year,
-    genre: s.genre, duration: s.duration, bit_rate: s.bit_rate,
-    cover_art: s.cover_art, user_rating: s.user_rating, disc_number: s.disc_number,
-  };
-}
 
 export function useSearch() {
   const [results, setResults] = useState<SearchResults>(emptyResults);
@@ -39,33 +30,15 @@ export function useSearch() {
       const id = ++reqIdRef.current;
       setLoading(true);
 
-      api.searchLocal(q).then((localSongs) => {
+      api.searchAll(q).then((local) => {
         if (id !== reqIdRef.current) return;
-        if (localSongs.length > 0) {
-          setResults((prev) => ({ ...prev, songs: localSongs }));
-        }
-      }).catch(() => {});
-
-      api.search(q).then((sr) => {
+        setResults(local);
+        setLoading(false);
+      }).catch(() => {
         if (id !== reqIdRef.current) return;
-
-        const albums = (sr.album ?? []).filter(
-          (a) => !a.artist || a.artist.toLowerCase() !== 'various artists',
-        );
-        const artists = (sr.artist ?? []).filter(
-          (a) => !a.name.includes(' & '),
-        );
-        const serverSongs = (sr.song ?? []).map(mapServerSong);
-
-        setResults((prev) => ({
-          artists,
-          albums,
-          songs: prev.songs.length > 0 ? prev.songs : serverSongs,
-        }));
-      }).catch(() => {}).finally(() => {
-        if (id === reqIdRef.current) setLoading(false);
+        setLoading(false);
       });
-    }, 150);
+    }, 50);
   }, []);
 
   const clear = useCallback(() => {

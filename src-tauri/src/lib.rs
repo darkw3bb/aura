@@ -167,6 +167,7 @@ pub fn run() {
             commands::get_cached_tracks_by_rating,
             commands::sync_library,
             commands::search_local,
+            commands::search_all,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
