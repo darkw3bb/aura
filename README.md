@@ -30,14 +30,18 @@
 
 ## Downloads
 
-| Platform | Architecture | Download |
-|----------|-------------|----------|
-| macOS | Apple Silicon (M1+) | [Aura.dmg (ARM64)](https://github.com/darkw3bb/aura/releases/latest) |
-| macOS | Intel | [Aura.dmg (x64)](https://github.com/darkw3bb/aura/releases/latest) |
-| Windows | x64 | [Aura-Setup.exe](https://github.com/darkw3bb/aura/releases/latest) |
-| Linux | x64 | [Aura.AppImage](https://github.com/darkw3bb/aura/releases/latest) |
+Head to the **[Releases](https://github.com/darkw3bb/aura/releases)** page and grab the latest build for your platform:
 
-> Aura auto-updates itself. Once installed, you'll get a banner when a new version is available -- one click to update and restart.
+| Platform | Architecture | What to download |
+|----------|-------------|-----------------|
+| macOS | Apple Silicon (M1/M2/M3/M4) | `Aura_x.x.x_aarch64.dmg` |
+| macOS | Intel | `Aura_x.x.x_x64.dmg` |
+| Windows | x64 | `Aura_x.x.x_x64-setup.exe` (NSIS installer) |
+| Linux | x64 | `Aura_x.x.x_amd64.AppImage` or `.deb` |
+
+> **Where are the builds?** Every tagged release triggers a GitHub Actions build across macOS, Windows, and Linux. The compiled installers are uploaded as assets to the [Releases](https://github.com/darkw3bb/aura/releases) page -- not under "Packages" (that's for container images/npm modules). Look for the **Assets** dropdown at the bottom of each release.
+
+> **Auto-updates:** Once installed, Aura checks for new versions automatically. You'll see a banner at the top of the app when an update is available -- one click to download, install, and restart.
 
 ---
 

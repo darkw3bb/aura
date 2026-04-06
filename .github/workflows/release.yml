@@ -69,7 +69,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: Aura ${{ github.ref_name }}
           releaseBody: 'See the assets below for download links.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           updaterJsonPreferNsis: true
           args: --target ${{ matrix.target }}
