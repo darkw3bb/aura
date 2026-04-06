@@ -150,11 +150,30 @@ impl CacheDb {
     pub fn upsert_track(&self, s: &Song) -> Result<(), String> {
         self.conn
             .execute(
-                "INSERT OR REPLACE INTO tracks (id, title, album, album_id, artist, artist_id, track_num, year, genre, duration, bit_rate, cover_art, user_rating, disc_number) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                "INSERT INTO tracks (id, title, album, album_id, artist, artist_id, track_num, year, genre, duration, bit_rate, cover_art, user_rating, disc_number)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                 ON CONFLICT(id) DO UPDATE SET
+                   title = excluded.title,
+                   album = excluded.album,
+                   album_id = excluded.album_id,
+                   artist = excluded.artist,
+                   artist_id = excluded.artist_id,
+                   track_num = excluded.track_num,
+                   year = excluded.year,
+                   genre = excluded.genre,
+                   duration = excluded.duration,
+                   bit_rate = excluded.bit_rate,
+                   cover_art = excluded.cover_art,
+                   user_rating = CASE
+                     WHEN excluded.user_rating IS NOT NULL AND excluded.user_rating > 0
+                     THEN excluded.user_rating
+                     ELSE tracks.user_rating
+                   END,
+                   disc_number = excluded.disc_number",
                 params![
                     s.id, s.title, s.album, s.album_id, s.artist, s.artist_id,
                     s.track, s.year, s.genre, s.duration, s.bit_rate,
-                    s.cover_art, s.user_rating.unwrap_or(0), s.disc_number
+                    s.cover_art, s.user_rating, s.disc_number
                 ],
             )
             .map_err(|e| format!("Insert track error: {}", e))?;
