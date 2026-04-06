@@ -14,6 +14,8 @@ interface PlayerStore {
   queue: Song[];
   /** Timestamp until which refreshState skips overwriting playback state (avoids clobbering optimistic updates). */
   _skipRefreshUntil: number;
+  /** Monotonic guard so only the latest play command clears the skip window. */
+  _playGuard: number;
 
   playTrack: (track: Song) => Promise<void>;
   playTrackInContext: (tracks: Song[], index: number) => Promise<void>;
@@ -42,20 +44,26 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   repeat: 'off',
   queue: [],
   _skipRefreshUntil: 0,
+  _playGuard: 0,
 
   playTrack: async (track: Song) => {
+    const guard = Date.now();
     set({
       isPlaying: true,
       currentTrack: track,
       elapsedSecs: 0,
       durationSecs: track.duration ?? null,
-      _skipRefreshUntil: Date.now() + 2000,
+      _skipRefreshUntil: Infinity,
+      _playGuard: guard,
     });
     try {
       await api.playTrack(track);
+      if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
       api.scrobble(track.id).catch(() => {});
     } catch (e) {
-      set({ isPlaying: false, currentTrack: null });
+      if (get()._playGuard === guard) {
+        set({ isPlaying: false, currentTrack: null, _skipRefreshUntil: 0 });
+      }
       console.error('Play error:', e);
     }
   },
@@ -63,19 +71,24 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   playTrackInContext: async (tracks: Song[], index: number) => {
     const track = tracks[index];
     if (!track) return;
+    const guard = Date.now();
     set({
       isPlaying: true,
       currentTrack: track,
       elapsedSecs: 0,
       durationSecs: track.duration ?? null,
       queue: tracks,
-      _skipRefreshUntil: Date.now() + 2000,
+      _skipRefreshUntil: Infinity,
+      _playGuard: guard,
     });
     try {
       await api.playTrackInContext(tracks, index);
+      if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
       api.scrobble(track.id).catch(() => {});
     } catch (e) {
-      set({ isPlaying: false, currentTrack: null });
+      if (get()._playGuard === guard) {
+        set({ isPlaying: false, currentTrack: null, _skipRefreshUntil: 0 });
+      }
       console.error('Play error:', e);
     }
   },
