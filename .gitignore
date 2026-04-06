@@ -31,5 +31,10 @@ npm-debug.log*
 # Generated icon source
 app-icon.png
 
+# Signing keys (NEVER commit these)
+*.key
+*.key.pub
+.tauri/
+
 # Rust
 *.pdb
