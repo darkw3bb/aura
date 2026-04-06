@@ -88,6 +88,8 @@ src/                 React + TypeScript frontend
 | Shortcut | Action |
 |----------|--------|
 | `Cmd/Ctrl + K` | Open search |
+| `Cmd/Ctrl + [` | Navigate back |
+| `Cmd/Ctrl + ]` | Navigate forward |
 | `Escape` | Close search / overlay |
 | Media keys | Play, Pause, Next, Previous (via OS) |
 

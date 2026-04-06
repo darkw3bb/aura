@@ -12,7 +12,7 @@ function formatDuration(secs?: number): string {
 }
 
 export function AlbumDetail() {
-  const { selectedAlbum, setView, loadArtist, updateAlbumRating } = useLibraryStore();
+  const { selectedAlbum, goBack, loadArtist, updateAlbumRating } = useLibraryStore();
   const { playTrackInContext, setRating, currentTrack, isPlaying } = usePlayerStore();
 
   const handleAlbumRating = async (rating: number) => {
@@ -32,10 +32,10 @@ export function AlbumDetail() {
   return (
     <div className="p-6 overflow-y-auto h-full">
       <button
-        onClick={() => setView('albums')}
+        onClick={goBack}
         className="nav-item text-[13px] mb-4 cursor-pointer bg-transparent border-0 px-0"
       >
-        &larr; Back to Albums
+        &larr; Back
       </button>
 
       <div className="flex gap-6 mb-6">

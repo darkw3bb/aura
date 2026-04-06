@@ -11,7 +11,7 @@ import { SearchOverlay } from './components/Search/SearchOverlay';
 import { RatedTracks } from './components/TrackList/RatedTracks';
 
 function App() {
-  const { view, setView, connected, connect } = useLibraryStore();
+  const { view, setView, connected, connect, canGoBack, canGoForward, goBack, goForward } = useLibraryStore();
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -27,6 +27,16 @@ function App() {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       setSearchOpen((prev) => !prev);
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === '[') {
+      e.preventDefault();
+      const { canGoBack, goBack } = useLibraryStore.getState();
+      if (canGoBack) goBack();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === ']') {
+      e.preventDefault();
+      const { canGoForward, goForward } = useLibraryStore.getState();
+      if (canGoForward) goForward();
     }
     if (e.key === 'Escape') {
       setSearchOpen(false);
@@ -145,19 +155,45 @@ function App() {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden min-w-0">
-          {view === 'settings' && <Settings />}
-          {view === 'albums' && <AlbumGrid />}
-          {view === 'album-detail' && <AlbumDetail />}
-          {view === 'artist-detail' && <ArtistDetail />}
-          {view === 'rated' && <RatedTracks />}
-          {view === 'artists' && (
-            <div className="p-6">
-              <h2 className="text-xl font-bold text-themed-primary">
-                Select an artist from the sidebar
-              </h2>
+        <div className="flex-1 overflow-hidden min-w-0 flex flex-col">
+          {connected && (
+            <div className="flex items-center gap-1 px-4 pt-3 pb-0 shrink-0">
+              <button
+                onClick={goBack}
+                disabled={!canGoBack}
+                className="nav-item p-1 rounded-md cursor-pointer disabled:opacity-25 disabled:cursor-default"
+                aria-label="Go back"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button
+                onClick={goForward}
+                disabled={!canGoForward}
+                className="nav-item p-1 rounded-md cursor-pointer disabled:opacity-25 disabled:cursor-default"
+                aria-label="Go forward"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
             </div>
           )}
+          <div className="flex-1 overflow-hidden min-w-0">
+            {view === 'settings' && <Settings />}
+            {view === 'albums' && <AlbumGrid />}
+            {view === 'album-detail' && <AlbumDetail />}
+            {view === 'artist-detail' && <ArtistDetail />}
+            {view === 'rated' && <RatedTracks />}
+            {view === 'artists' && (
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-themed-primary">
+                  Select an artist from the sidebar
+                </h2>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
