@@ -13,6 +13,8 @@
     --accent-hover: #818cf8;
     --border: #27272a;
     --rating-star: #f59e0b;
+    --error: #f87171;
+    --success: #4ade80;
   }
 
   * {
@@ -70,10 +72,82 @@
   .bg-themed-primary { background: var(--bg-primary); }
   .bg-themed-secondary { background: var(--bg-secondary); }
   .bg-themed-tertiary { background: var(--bg-tertiary); }
+  .bg-themed-hover { background: var(--bg-hover); }
+  .bg-themed-accent { background: var(--accent); }
+  .bg-themed-accent-hover { background: var(--accent-hover); }
   .text-themed-primary { color: var(--text-primary); }
   .text-themed-secondary { color: var(--text-secondary); }
   .text-themed-muted { color: var(--text-muted); }
+  .text-themed-accent { color: var(--accent); }
+  .text-themed-accent-hover { color: var(--accent-hover); }
+  .text-themed-error { color: var(--error); }
+  .text-themed-success { color: var(--success); }
   .border-themed { border-color: var(--border); }
+  .border-themed-accent { border-color: var(--accent); }
+  .stroke-themed-muted { stroke: var(--text-muted); }
+  .fill-themed-bg-primary { fill: var(--bg-primary); }
+  .stroke-themed-bg-primary { stroke: var(--bg-primary); }
+
+  .input-themed {
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+  .input-themed:focus {
+    border-color: var(--accent);
+  }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-accent:hover {
+    background: var(--accent-hover);
+  }
+
+  .control-btn {
+    color: var(--text-secondary);
+    transition: color 120ms ease;
+  }
+  .control-btn:hover {
+    color: var(--text-primary);
+  }
+  .control-btn[data-active="true"] {
+    color: var(--accent);
+  }
+  .control-btn[data-active="true"]:hover {
+    color: var(--accent-hover);
+  }
+
+  .play-btn {
+    background: var(--text-primary);
+  }
+  .play-btn svg {
+    fill: var(--bg-primary);
+    stroke: var(--bg-primary);
+  }
+
+  .progress-track {
+    background: var(--bg-tertiary);
+  }
+  .progress-fill {
+    background: var(--accent);
+  }
+
+  .volume-slider {
+    background: var(--bg-tertiary);
+    accent-color: var(--accent);
+  }
+
+  .border-top-themed {
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-outline-themed {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
 
   .row-hover {
     transition: background-color 150ms ease;

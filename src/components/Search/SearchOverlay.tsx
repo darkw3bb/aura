@@ -154,7 +154,7 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 px-4 py-3 border-b border-themed">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="stroke-themed-muted" strokeWidth="2">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>

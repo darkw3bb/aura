@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useLibraryStore } from '../../stores/libraryStore';
 import { CoverArt } from '../Library/CoverArt';
 import { StarRating } from '../Rating/StarRating';
 import type { Song } from '../../lib/tauri';
@@ -17,6 +18,7 @@ export function PlayerBar() {
     toggleShuffle, toggleRepeat, seek, setVolume, refreshState, setRating,
   } = usePlayerStore();
 
+  const { loadArtist, loadAlbum } = useLibraryStore();
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
@@ -27,22 +29,50 @@ export function PlayerBar() {
   const progress = durationSecs ? (elapsedSecs / durationSecs) * 100 : 0;
 
   return (
-    <div
-      className="h-20 flex items-center px-6 gap-4 shrink-0 overflow-hidden min-w-0"
-      style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}
-    >
+    <div className="h-20 flex items-center px-6 gap-4 shrink-0 overflow-hidden min-w-0 bg-themed-secondary border-top-themed">
       {/* Track info */}
-      <div className="flex items-center gap-3 w-64 shrink-0 min-w-0">
+      <div className="flex items-center gap-3 w-72 shrink-0 min-w-0">
         {currentTrack ? (
           <>
-            <CoverArt coverArt={currentTrack.cover_art} artist={currentTrack.artist} albumName={currentTrack.album} size={100} className="w-12 h-12 rounded" />
+            {currentTrack.album_id ? (
+              <button
+                onClick={() => loadAlbum(currentTrack.album_id!)}
+                className="bg-transparent border-0 p-0 cursor-pointer shrink-0"
+                title={currentTrack.album ?? 'Go to album'}
+              >
+                <CoverArt coverArt={currentTrack.cover_art} artist={currentTrack.artist} albumName={currentTrack.album} size={100} className="w-12 h-12 rounded" />
+              </button>
+            ) : (
+              <CoverArt coverArt={currentTrack.cover_art} artist={currentTrack.artist} albumName={currentTrack.album} size={100} className="w-12 h-12 rounded" />
+            )}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-sm font-medium truncate text-themed-primary">
                 {currentTrack.title}
               </p>
               <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-                {currentTrack.artist ?? 'Unknown'}
+                {currentTrack.artist_id ? (
+                  <button
+                    onClick={() => loadArtist(currentTrack.artist_id!)}
+                    className="bg-transparent border-0 p-0 cursor-pointer text-xs hover:underline"
+                    style={{ color: 'inherit' }}
+                  >
+                    {currentTrack.artist ?? 'Unknown'}
+                  </button>
+                ) : (currentTrack.artist ?? 'Unknown')}
               </p>
+              {currentTrack.album && (
+                <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                  {currentTrack.album_id ? (
+                    <button
+                      onClick={() => loadAlbum(currentTrack.album_id!)}
+                      className="bg-transparent border-0 p-0 cursor-pointer text-xs hover:underline"
+                      style={{ color: 'inherit' }}
+                    >
+                      {currentTrack.album}
+                    </button>
+                  ) : currentTrack.album}
+                </p>
+              )}
             </div>
             <StarRating
               rating={currentTrack.user_rating ?? 0}
@@ -51,7 +81,7 @@ export function PlayerBar() {
             />
           </>
         ) : (
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No track playing</p>
+          <p className="text-sm text-themed-muted">No track playing</p>
         )}
       </div>
 
@@ -73,11 +103,10 @@ export function PlayerBar() {
 
           <button
             onClick={isPlaying ? pause : resume}
-            className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-colors"
-            style={{ background: 'var(--text-primary)' }}
+            className="play-btn w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-colors"
             title={isPlaying ? 'Pause' : 'Play'}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--bg-primary)" stroke="var(--bg-primary)" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2">
               {isPlaying ? (
                 <>
                   <rect x="6" y="4" width="4" height="16" />
@@ -111,12 +140,11 @@ export function PlayerBar() {
 
         {/* Progress bar */}
         <div className="flex items-center gap-2 w-full max-w-lg">
-          <span className="text-xs w-10 text-right" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-xs w-10 text-right text-themed-muted">
             {formatTime(elapsedSecs)}
           </span>
           <div
-            className="flex-1 h-1.5 rounded-full cursor-pointer group relative"
-            style={{ background: 'var(--bg-tertiary)' }}
+            className="flex-1 h-1.5 rounded-full cursor-pointer group relative progress-track"
             onClick={(e) => {
               if (!durationSecs) return;
               const rect = e.currentTarget.getBoundingClientRect();
@@ -125,11 +153,11 @@ export function PlayerBar() {
             }}
           >
             <div
-              className="h-full rounded-full"
-              style={{ width: `${progress}%`, background: 'var(--accent)' }}
+              className="h-full rounded-full progress-fill"
+              style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="text-xs w-10" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-xs w-10 text-themed-muted">
             {durationSecs ? formatTime(durationSecs) : '--:--'}
           </span>
         </div>
@@ -138,7 +166,7 @@ export function PlayerBar() {
       {/* Volume + Format */}
       <div className="flex items-center gap-3 shrink-0">
         <div className="flex items-center gap-2 w-32">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" className="shrink-0">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 stroke-themed-muted" strokeWidth="2">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
             {volume > 0 && <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />}
             {volume > 0.5 && <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />}
@@ -150,8 +178,7 @@ export function PlayerBar() {
             step="0.01"
             value={volume}
             onChange={(e) => setVolume(parseFloat(e.target.value))}
-            className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-            style={{ background: 'var(--bg-tertiary)', accentColor: 'var(--accent)' }}
+            className="flex-1 h-1 rounded-full appearance-none cursor-pointer volume-slider"
           />
         </div>
         {currentTrack && <FormatPill track={currentTrack} isPlaying={isPlaying} />}
@@ -184,12 +211,12 @@ function FormatPill({ track, isPlaying }: { track: Song; isPlaying: boolean }) {
         <span className="eq-bar" />
       </div>
       {format && (
-        <span className="text-[10px] font-bold tracking-wide" style={{ color: 'var(--accent)' }}>
+        <span className="text-[10px] font-bold tracking-wide text-themed-accent">
           {format}
         </span>
       )}
       {bitRate && (
-        <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+        <span className="text-[10px] text-themed-secondary">
           {bitRate}k
         </span>
       )}
@@ -211,11 +238,9 @@ function ControlButton({
   return (
     <button
       onClick={onClick}
-      className="p-1.5 rounded transition-colors cursor-pointer bg-transparent border-0"
+      data-active={active}
+      className="control-btn p-1.5 rounded cursor-pointer bg-transparent border-0"
       title={title}
-      style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)' }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = active ? 'var(--accent-hover)' : 'var(--text-primary)')}
-      onMouseLeave={(e) => (e.currentTarget.style.color = active ? 'var(--accent)' : 'var(--text-secondary)')}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         {children}

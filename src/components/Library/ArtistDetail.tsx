@@ -49,8 +49,7 @@ export function ArtistDetail() {
         {allSongs.length > 0 && (
           <button
             onClick={() => playTrackInContext(allSongs, 0)}
-            className="mt-3 px-6 py-2 rounded-full text-[13px] font-medium text-white cursor-pointer w-fit"
-            style={{ background: 'var(--accent)' }}
+            className="mt-3 px-6 py-2 rounded-full text-[13px] font-medium cursor-pointer w-fit btn-accent"
           >
             Play All
           </button>
@@ -133,7 +132,7 @@ function AlbumSection({
               )}
             </span>
             <div className="flex-1 min-w-0">
-              <p className={`text-[13px] truncate ${currentTrack?.id === song.id ? '' : 'text-themed-primary'}`} style={currentTrack?.id === song.id ? { color: 'var(--accent)' } : undefined}>
+              <p className={`text-[13px] truncate ${currentTrack?.id === song.id ? 'text-themed-accent' : 'text-themed-primary'}`}>
                 {song.title}
               </p>
             </div>

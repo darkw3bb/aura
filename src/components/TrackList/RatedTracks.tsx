@@ -174,7 +174,7 @@ export function RatedTracks() {
                     virtualRow.index + 1
                   )}
                 </span>
-                <span className={`flex-1 min-w-0 text-[13px] truncate ${currentTrack?.id === track.id ? '' : 'text-themed-primary'}`} style={currentTrack?.id === track.id ? { color: 'var(--accent)' } : undefined}>
+                <span className={`flex-1 min-w-0 text-[13px] truncate ${currentTrack?.id === track.id ? 'text-themed-accent' : 'text-themed-primary'}`}>
                   {track.title}
                 </span>
                 <span className="w-36 min-w-0 text-[13px] truncate text-themed-secondary">

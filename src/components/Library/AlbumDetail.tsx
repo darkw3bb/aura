@@ -78,8 +78,7 @@ export function AlbumDetail() {
             onClick={() => {
               if (songs.length > 0) playTrackInContext(songs, 0);
             }}
-            className="mt-3 px-6 py-2 rounded-full text-[13px] font-medium text-white cursor-pointer w-fit"
-            style={{ background: 'var(--accent)' }}
+            className="mt-3 px-6 py-2 rounded-full text-[13px] font-medium cursor-pointer w-fit btn-accent"
           >
             Play All
           </button>
@@ -103,7 +102,7 @@ export function AlbumDetail() {
               )}
             </span>
             <div className="flex-1 min-w-0">
-              <p className={`text-[13px] truncate ${currentTrack?.id === song.id ? '' : 'text-themed-primary'}`} style={currentTrack?.id === song.id ? { color: 'var(--accent)' } : undefined}>
+              <p className={`text-[13px] truncate ${currentTrack?.id === song.id ? 'text-themed-accent' : 'text-themed-primary'}`}>
                 {song.title}
               </p>
               {song.artist && song.artist !== selectedAlbum.artist && (
