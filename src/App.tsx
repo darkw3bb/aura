@@ -14,6 +14,7 @@ import { GenreList } from './components/Library/GenreList';
 import { GenreTracks } from './components/TrackList/GenreTracks';
 import { QueuePanel } from './components/Queue/QueuePanel';
 import { ContextMenu } from './components/ContextMenu/ContextMenu';
+import { UpdateBanner } from './components/UpdateBanner';
 
 function App() {
   const { view, setView, connected, connect, canGoBack, canGoForward, goBack, goForward } = useLibraryStore();
@@ -66,6 +67,7 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-themed-primary overflow-hidden">
+      <UpdateBanner />
       <div className="flex flex-1 overflow-hidden min-w-0">
         {connected && (
           <div className="w-56 shrink-0 flex flex-col overflow-hidden bg-themed-secondary border-r border-themed">
