@@ -2,6 +2,9 @@ import { midnight } from './midnight';
 import { nord } from './nord';
 import { catppuccin } from './catppuccin';
 import { auraLight } from './aura-light';
+import { winamp } from './winamp';
+import { matrix } from './matrix';
+import { itunesClassic } from './itunes-classic';
 
 export interface Theme {
   id: string;
@@ -28,6 +31,9 @@ export const themes: Record<string, Theme> = {
   nord,
   catppuccin,
   'aura-light': auraLight,
+  winamp,
+  matrix,
+  'itunes-classic': itunesClassic,
 };
 
 export const defaultThemeId = 'midnight';
