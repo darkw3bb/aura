@@ -41,8 +41,17 @@ impl Player {
         }
     }
 
+    fn reinit_device(&mut self) -> Result<(), String> {
+        self.device_sink = Some(
+            DeviceSinkBuilder::open_default_sink()
+                .map_err(|e| format!("Failed to open audio device: {}", e))?,
+        );
+        Ok(())
+    }
+
     pub fn play_bytes(&mut self, data: bytes::Bytes, track: Song) -> Result<(), String> {
         self.stop();
+        self.reinit_device()?;
 
         let device_sink = self
             .device_sink
