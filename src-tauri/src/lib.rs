@@ -153,6 +153,8 @@ pub fn run() {
             commands::get_album,
             commands::get_album_list,
             commands::search,
+            commands::get_genres,
+            commands::get_songs_by_genre,
             commands::stream_track,
             commands::get_cover_art_url,
             commands::fetch_cover_art,

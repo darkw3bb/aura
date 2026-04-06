@@ -185,6 +185,43 @@ pub struct SearchResult {
     pub song: Option<Vec<Song>>,
 }
 
+// -- Genres --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Genre {
+    #[serde(rename = "value")]
+    pub value: String,
+    #[serde(alias = "songCount", default)]
+    pub song_count: i32,
+    #[serde(alias = "albumCount", default)]
+    pub album_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenresBody {
+    pub genres: Option<GenresContainer>,
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenresContainer {
+    pub genre: Option<Vec<Genre>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SongsByGenreBody {
+    pub songs_by_genre: Option<SongsByGenreContainer>,
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SongsByGenreContainer {
+    pub song: Option<Vec<Song>>,
+}
+
 // -- Ping --
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

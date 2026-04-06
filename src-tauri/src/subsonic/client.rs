@@ -145,6 +145,38 @@ impl SubsonicClient {
             .unwrap_or_default())
     }
 
+    pub async fn get_genres(&self) -> Result<Vec<Genre>, String> {
+        let body: GenresBody = self.get("getGenres", &[]).await?;
+        Ok(body
+            .genres
+            .and_then(|g| g.genre)
+            .unwrap_or_default())
+    }
+
+    pub async fn get_songs_by_genre(
+        &self,
+        genre: &str,
+        count: i32,
+        offset: i32,
+    ) -> Result<Vec<Song>, String> {
+        let count_str = count.to_string();
+        let offset_str = offset.to_string();
+        let body: SongsByGenreBody = self
+            .get(
+                "getSongsByGenre",
+                &[
+                    ("genre", genre),
+                    ("count", &count_str),
+                    ("offset", &offset_str),
+                ],
+            )
+            .await?;
+        Ok(body
+            .songs_by_genre
+            .and_then(|s| s.song)
+            .unwrap_or_default())
+    }
+
     pub async fn search(&self, query: &str) -> Result<SearchResult, String> {
         let body: SearchBody = self.get("search3", &[("query", query)]).await?;
         Ok(body.search_result3.unwrap_or(SearchResult {

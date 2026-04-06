@@ -1,14 +1,15 @@
 import { useState, useCallback, useRef } from 'react';
 import { api } from '../lib/tauri';
-import type { Artist, Album, FlatSong } from '../lib/tauri';
+import type { Artist, Album, FlatSong, Genre } from '../lib/tauri';
 
 export interface SearchResults {
   artists: Artist[];
   albums: Album[];
   songs: FlatSong[];
+  genres: Genre[];
 }
 
-const emptyResults: SearchResults = { artists: [], albums: [], songs: [] };
+const emptyResults: SearchResults = { artists: [], albums: [], songs: [], genres: [] };
 
 export function useSearch() {
   const [results, setResults] = useState<SearchResults>(emptyResults);
@@ -16,6 +17,7 @@ export function useSearch() {
   const [query, setQuery] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const reqIdRef = useRef(0);
+  const genreCacheRef = useRef<Genre[] | null>(null);
 
   const search = useCallback((q: string) => {
     setQuery(q);
@@ -30,9 +32,15 @@ export function useSearch() {
       const id = ++reqIdRef.current;
       setLoading(true);
 
-      api.searchAll(q).then((local) => {
+      const genrePromise = genreCacheRef.current
+        ? Promise.resolve(genreCacheRef.current)
+        : api.getGenres().then((g) => { genreCacheRef.current = g; return g; }).catch(() => [] as Genre[]);
+
+      Promise.all([api.searchAll(q), genrePromise]).then(([local, allGenres]) => {
         if (id !== reqIdRef.current) return;
-        setResults(local);
+        const lower = q.toLowerCase();
+        const matchedGenres = allGenres.filter((g) => g.value.toLowerCase().includes(lower));
+        setResults({ ...local, genres: matchedGenres });
         setLoading(false);
       }).catch(() => {
         if (id !== reqIdRef.current) return;

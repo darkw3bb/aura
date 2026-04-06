@@ -3,7 +3,7 @@ import { useSearch } from '../../hooks/useSearch';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { CoverArt } from '../Library/CoverArt';
-import type { FlatSong, Artist, Album } from '../../lib/tauri';
+import type { FlatSong, Artist, Album, Genre } from '../../lib/tauri';
 
 function formatDuration(secs?: number): string {
   if (!secs) return '--:--';
@@ -34,6 +34,7 @@ function flatSongToSong(f: FlatSong) {
 type SearchItem =
   | { type: 'artist'; data: Artist }
   | { type: 'album'; data: Album }
+  | { type: 'genre'; data: Genre }
   | { type: 'song'; data: FlatSong };
 
 interface SearchOverlayProps {
@@ -59,6 +60,15 @@ function AlbumIcon() {
   );
 }
 
+function GenreIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
 function TrackIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -72,7 +82,7 @@ function TrackIcon() {
 export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
   const { query, results, loading, search, clear } = useSearch();
   const { playTrack } = usePlayerStore();
-  const { loadArtist, loadAlbum } = useLibraryStore();
+  const { loadArtist, loadAlbum, loadGenre } = useLibraryStore();
   const [activeIndex, setActiveIndex] = useState(0);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const keyboardNavRef = useRef(false);
@@ -81,6 +91,7 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
     const items: SearchItem[] = [];
     for (const a of results.artists) items.push({ type: 'artist', data: a });
     for (const a of results.albums) items.push({ type: 'album', data: a });
+    for (const g of results.genres) items.push({ type: 'genre', data: g });
     for (const s of results.songs) items.push({ type: 'song', data: s });
     return items;
   }, [results]);
@@ -95,10 +106,11 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
     switch (item.type) {
       case 'artist': loadArtist(item.data.id); break;
       case 'album': loadAlbum(item.data.id); break;
+      case 'genre': loadGenre(item.data.value); break;
       case 'song': playTrack(flatSongToSong(item.data)); break;
     }
     onClose();
-  }, [loadArtist, loadAlbum, playTrack, onClose]);
+  }, [loadArtist, loadAlbum, loadGenre, playTrack, onClose]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -132,12 +144,13 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
 
   if (!open) return null;
 
-  const { artists, albums, songs } = results;
-  const hasResults = artists.length > 0 || albums.length > 0 || songs.length > 0;
+  const { artists, albums, songs, genres } = results;
+  const hasResults = artists.length > 0 || albums.length > 0 || genres.length > 0 || songs.length > 0;
 
   const artistStartIdx = 0;
   const albumStartIdx = artists.length;
-  const songStartIdx = artists.length + albums.length;
+  const genreStartIdx = artists.length + albums.length;
+  const songStartIdx = artists.length + albums.length + genres.length;
 
   const setRowRef = (flatIdx: number) => (el: HTMLDivElement | null) => {
     rowRefs.current[flatIdx] = el;
@@ -242,6 +255,41 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                         </p>
                       </div>
                       <span className="search-type-pill">Album</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {genres.length > 0 && (
+              <div className="search-group">
+                <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-2 bg-themed-secondary border-b border-themed">
+                  <span className="text-themed-muted"><GenreIcon /></span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-themed-muted">Genres</span>
+                  <span className="text-[10px] text-themed-muted opacity-60">{genres.length}</span>
+                </div>
+                {genres.map((genre, i) => {
+                  const flatIdx = genreStartIdx + i;
+                  return (
+                    <div
+                      key={genre.value}
+                      ref={setRowRef(flatIdx)}
+                      className={`track-row flex items-center gap-3 px-4 py-2 cursor-pointer ${flatIdx === activeIndex ? 'track-row-active' : ''}`}
+                      onClick={() => { loadGenre(genre.value); onClose(); }}
+                      onMouseEnter={() => handleMouseEnter(flatIdx)}
+                    >
+                      <div className="w-8 h-8 rounded shrink-0 flex items-center justify-center bg-themed-tertiary text-themed-muted">
+                        <GenreIcon />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] truncate text-themed-primary">{genre.value}</p>
+                        <p className="text-[11px] text-themed-muted">
+                          {genre.song_count} track{genre.song_count !== 1 ? 's' : ''}
+                          {' \u00b7 '}
+                          {genre.album_count} album{genre.album_count !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <span className="search-type-pill">Genre</span>
                     </div>
                   );
                 })}

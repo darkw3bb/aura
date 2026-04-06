@@ -9,6 +9,8 @@ import { ArtistDetail } from './components/Library/ArtistDetail';
 import { PlayerBar } from './components/Player/PlayerBar';
 import { SearchOverlay } from './components/Search/SearchOverlay';
 import { RatedTracks } from './components/TrackList/RatedTracks';
+import { GenreList } from './components/Library/GenreList';
+import { GenreTracks } from './components/TrackList/GenreTracks';
 
 function App() {
   const { view, setView, connected, connect, canGoBack, canGoForward, goBack, goForward } = useLibraryStore();
@@ -102,6 +104,19 @@ function App() {
                 </NavButton>
 
                 <NavButton
+                  active={view === 'genres' || view === 'genre-detail'}
+                  onClick={() => setView('genres')}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                      <line x1="7" y1="7" x2="7.01" y2="7" />
+                    </svg>
+                  }
+                >
+                  Genres
+                </NavButton>
+
+                <NavButton
                   active={view === 'rated'}
                   onClick={() => setView('rated')}
                   icon={
@@ -186,6 +201,8 @@ function App() {
             {view === 'album-detail' && <AlbumDetail />}
             {view === 'artist-detail' && <ArtistDetail />}
             {view === 'rated' && <RatedTracks />}
+            {view === 'genres' && <GenreList />}
+            {view === 'genre-detail' && <GenreTracks />}
             {view === 'artists' && (
               <div className="p-6">
                 <h2 className="text-xl font-bold text-themed-primary">

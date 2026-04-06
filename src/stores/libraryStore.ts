@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import { api } from '../lib/tauri';
 import type { Artist, Album, AlbumDetail, ArtistDetail } from '../lib/tauri';
 
-type View = 'albums' | 'artists' | 'artist-detail' | 'album-detail' | 'rated' | 'settings';
+type View = 'albums' | 'artists' | 'artist-detail' | 'album-detail' | 'rated' | 'genres' | 'genre-detail' | 'settings';
 
 interface NavEntry {
   view: View;
   selectedAlbum: AlbumDetail | null;
   selectedArtist: ArtistDetail | null;
   artistAlbums: AlbumDetail[];
+  selectedGenre: string | null;
 }
 
 interface LibraryStore {
@@ -20,6 +21,7 @@ interface LibraryStore {
   selectedAlbum: AlbumDetail | null;
   selectedArtist: ArtistDetail | null;
   artistAlbums: AlbumDetail[];
+  selectedGenre: string | null;
   syncing: boolean;
   syncMessage: string;
   error: string | null;
@@ -35,6 +37,7 @@ interface LibraryStore {
   loadAlbums: (type?: string) => Promise<void>;
   loadAlbum: (id: string) => Promise<void>;
   loadArtist: (id: string) => Promise<void>;
+  loadGenre: (genre: string) => void;
   goBack: () => void;
   goForward: () => void;
   syncLibrary: () => Promise<void>;
@@ -47,6 +50,7 @@ const initialNavEntry: NavEntry = {
   selectedAlbum: null,
   selectedArtist: null,
   artistAlbums: [],
+  selectedGenre: null,
 };
 
 function pushNav(state: LibraryStore, entry: NavEntry) {
@@ -71,6 +75,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   selectedAlbum: null,
   selectedArtist: null,
   artistAlbums: [],
+  selectedGenre: null,
   syncing: false,
   syncMessage: '',
   error: null,
@@ -81,7 +86,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   canGoForward: false,
 
   setView: (view) => {
-    const entry: NavEntry = { view, selectedAlbum: null, selectedArtist: null, artistAlbums: [] };
+    const entry: NavEntry = { view, selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null };
     set((s) => pushNav(s, entry));
   },
 
@@ -92,7 +97,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
       localStorage.setItem('ae_server_url', url);
       localStorage.setItem('ae_username', username);
       localStorage.setItem('ae_password', password);
-      const entry: NavEntry = { view: 'albums', selectedAlbum: null, selectedArtist: null, artistAlbums: [] };
+      const entry: NavEntry = { view: 'albums', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null };
       set({
         connected: true,
         serverUrl: url,
@@ -100,6 +105,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
         selectedAlbum: null,
         selectedArtist: null,
         artistAlbums: [],
+        selectedGenre: null,
         navStack: [entry],
         navIndex: 0,
         canGoBack: false,
@@ -131,7 +137,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   loadAlbum: async (id: string) => {
     try {
       const album = await api.getAlbum(id);
-      const entry: NavEntry = { view: 'album-detail', selectedAlbum: album, selectedArtist: null, artistAlbums: [] };
+      const entry: NavEntry = { view: 'album-detail', selectedAlbum: album, selectedArtist: null, artistAlbums: [], selectedGenre: null };
       set((s) => pushNav(s, entry));
     } catch (e) {
       console.error('Load album error:', e);
@@ -141,7 +147,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   loadArtist: async (id: string) => {
     try {
       const artist = await api.getArtist(id);
-      const entry: NavEntry = { view: 'artist-detail', selectedAlbum: null, selectedArtist: artist, artistAlbums: [] };
+      const entry: NavEntry = { view: 'artist-detail', selectedAlbum: null, selectedArtist: artist, artistAlbums: [], selectedGenre: null };
       set((s) => pushNav(s, entry));
       const albumDetails = await Promise.all(
         (artist.album ?? []).map((a) => api.getAlbum(a.id))
@@ -154,6 +160,11 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
     } catch (e) {
       console.error('Load artist error:', e);
     }
+  },
+
+  loadGenre: (genre: string) => {
+    const entry: NavEntry = { view: 'genre-detail', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: genre };
+    set((s) => pushNav(s, entry));
   },
 
   goBack: () => {

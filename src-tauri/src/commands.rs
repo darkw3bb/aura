@@ -150,6 +150,63 @@ pub async fn search(
     client.search(&query).await
 }
 
+// -- Genres --
+
+#[tauri::command]
+pub async fn get_genres(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Vec<Genre>, String> {
+    if let Some(ref cache) = *state.cache.lock() {
+        if let Ok(genres) = cache.get_genres() {
+            if !genres.is_empty() {
+                return Ok(genres);
+            }
+        }
+    }
+
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    client.get_genres().await
+}
+
+#[tauri::command]
+pub async fn get_songs_by_genre(
+    state: tauri::State<'_, Arc<AppState>>,
+    genre: String,
+    size: Option<i32>,
+    offset: Option<i32>,
+) -> Result<Vec<FlatSong>, String> {
+    let sz = size.unwrap_or(50);
+    let off = offset.unwrap_or(0);
+
+    if let Some(ref cache) = *state.cache.lock() {
+        if let Ok(tracks) = cache.get_tracks_by_genre(&genre, off, sz) {
+            return Ok(tracks);
+        }
+    }
+
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    let songs = client.get_songs_by_genre(&genre, sz, off).await?;
+    Ok(songs
+        .into_iter()
+        .map(|s| FlatSong {
+            id: s.id,
+            title: s.title,
+            album: s.album,
+            album_id: s.album_id,
+            artist: s.artist,
+            artist_id: s.artist_id,
+            track: s.track,
+            year: s.year,
+            genre: s.genre,
+            duration: s.duration,
+            bit_rate: s.bit_rate,
+            cover_art: s.cover_art,
+            user_rating: s.user_rating,
+            disc_number: s.disc_number,
+        })
+        .collect())
+}
+
 // -- Streaming --
 
 #[tauri::command]

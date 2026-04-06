@@ -95,6 +95,12 @@ export interface LocalSearchResult {
   songs: FlatSong[];
 }
 
+export interface Genre {
+  value: string;
+  song_count: number;
+  album_count: number;
+}
+
 export interface PlaybackState {
   isPlaying: boolean;
   currentTrack?: Song;
@@ -115,6 +121,9 @@ export const api = {
   getAlbumList: (listType: string, size?: number, offset?: number) =>
     invoke<Album[]>('get_album_list', { listType, size, offset }),
   search: (query: string) => invoke<SearchResult>('search', { query }),
+  getGenres: () => invoke<Genre[]>('get_genres'),
+  getSongsByGenre: (genre: string, size?: number, offset?: number) =>
+    invoke<FlatSong[]>('get_songs_by_genre', { genre, size, offset }),
 
   streamTrack: (id: string) => invoke<string>('stream_track', { id }),
   getCoverArtUrl: (id: string, size?: number) =>
