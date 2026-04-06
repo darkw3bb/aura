@@ -21,7 +21,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 rusqlite = { version = "0.31", features = ["bundled", "serde_json"] }
-rodio = { version = "0.19", features = ["symphonia-all"] }
+rodio = { version = "0.22", features = ["symphonia-all"] }
 souvlaki = "0.8"
 md-5 = "0.10"
 hex = "0.4"

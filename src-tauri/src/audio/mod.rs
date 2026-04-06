@@ -1,7 +1,7 @@
 pub mod queue;
 
 use parking_lot::Mutex as PLMutex;
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
+use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player as RodioPlayer};
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -10,9 +10,8 @@ use self::queue::PlayQueue;
 use crate::subsonic::models::Song;
 
 pub struct Player {
-    _stream: Option<OutputStream>,
-    stream_handle: Option<OutputStreamHandle>,
-    sink: Option<Sink>,
+    device_sink: Option<MixerDeviceSink>,
+    rodio_player: Option<RodioPlayer>,
     current_track: Option<Song>,
     volume: f32,
     queue: PlayQueue,
@@ -20,7 +19,6 @@ pub struct Player {
     paused_elapsed: Duration,
     is_playing: bool,
     track_duration: Option<Duration>,
-    // Shared reference for pre-buffered next track data
     next_track_buffer: Arc<PLMutex<Option<bytes::Bytes>>>,
 }
 
@@ -28,11 +26,10 @@ unsafe impl Send for Player {}
 
 impl Player {
     pub fn new() -> Self {
-        let (stream, handle) = OutputStream::try_default().ok().unzip();
+        let device_sink = DeviceSinkBuilder::open_default_sink().ok();
         Self {
-            _stream: stream,
-            stream_handle: handle,
-            sink: None,
+            device_sink,
+            rodio_player: None,
             current_track: None,
             volume: 0.8,
             queue: PlayQueue::new(),
@@ -47,23 +44,23 @@ impl Player {
     pub fn play_bytes(&mut self, data: bytes::Bytes, track: Song) -> Result<(), String> {
         self.stop();
 
-        let handle = self
-            .stream_handle
+        let device_sink = self
+            .device_sink
             .as_ref()
             .ok_or("No audio output available")?;
 
-        let sink = Sink::try_new(handle).map_err(|e| format!("Failed to create sink: {}", e))?;
+        let player = RodioPlayer::connect_new(device_sink.mixer());
 
         let cursor = Cursor::new(data);
         let source =
             Decoder::new(cursor).map_err(|e| format!("Failed to decode audio: {}", e))?;
 
-        sink.set_volume(self.volume);
-        sink.append(source);
+        player.set_volume(self.volume);
+        player.append(source);
 
         self.track_duration = track.duration.map(|d| Duration::from_secs(d as u64));
         self.current_track = Some(track);
-        self.sink = Some(sink);
+        self.rodio_player = Some(player);
         self.playback_start = Some(Instant::now());
         self.paused_elapsed = Duration::ZERO;
         self.is_playing = true;
@@ -72,8 +69,8 @@ impl Player {
     }
 
     pub fn pause(&mut self) {
-        if let Some(sink) = &self.sink {
-            sink.pause();
+        if let Some(player) = &self.rodio_player {
+            player.pause();
             if let Some(start) = self.playback_start {
                 self.paused_elapsed += start.elapsed();
             }
@@ -83,16 +80,16 @@ impl Player {
     }
 
     pub fn resume(&mut self) {
-        if let Some(sink) = &self.sink {
-            sink.play();
+        if let Some(player) = &self.rodio_player {
+            player.play();
             self.playback_start = Some(Instant::now());
             self.is_playing = true;
         }
     }
 
     pub fn stop(&mut self) {
-        if let Some(sink) = self.sink.take() {
-            sink.stop();
+        if let Some(player) = self.rodio_player.take() {
+            player.stop();
         }
         self.current_track = None;
         self.playback_start = None;
@@ -102,8 +99,8 @@ impl Player {
     }
 
     pub fn seek(&mut self, position: Duration) -> Result<(), String> {
-        if let Some(sink) = &self.sink {
-            sink.try_seek(position).map_err(|e| format!("Seek error: {}", e))?;
+        if let Some(player) = &self.rodio_player {
+            player.try_seek(position).map_err(|e| format!("Seek error: {}", e))?;
             self.paused_elapsed = position;
             self.playback_start = if self.is_playing {
                 Some(Instant::now())
@@ -116,8 +113,8 @@ impl Player {
 
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume.clamp(0.0, 1.0);
-        if let Some(sink) = &self.sink {
-            sink.set_volume(self.volume);
+        if let Some(player) = &self.rodio_player {
+            player.set_volume(self.volume);
         }
     }
 
@@ -126,7 +123,7 @@ impl Player {
     }
 
     pub fn is_finished(&self) -> bool {
-        self.sink.as_ref().map(|s| s.empty()).unwrap_or(true)
+        self.rodio_player.as_ref().map(|p| p.empty()).unwrap_or(true)
     }
 
     pub fn elapsed(&self) -> Duration {
