@@ -15,7 +15,7 @@ function formatDuration(secs?: number): string {
 }
 
 export function AlbumDetail() {
-  const { selectedAlbum, goBack, loadArtist, updateAlbumRating } = useLibraryStore();
+  const { selectedAlbum, loadArtist, updateAlbumRating } = useLibraryStore();
   const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
   const showContextMenu = useContextMenuStore((s) => s.show);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -47,13 +47,6 @@ export function AlbumDetail() {
 
   return (
     <div ref={scrollRef} className="p-6 overflow-y-auto h-full" onMouseMove={handleMouseMove}>
-      <button
-        onClick={goBack}
-        className="nav-item text-[13px] mb-4 cursor-pointer bg-transparent border-0 px-0"
-      >
-        &larr; Back
-      </button>
-
       <div className="flex gap-6 mb-6">
         <CoverArt
           coverArt={selectedAlbum.cover_art}
