@@ -205,6 +205,8 @@ pub async fn get_songs_by_genre(
             cover_art: s.cover_art,
             user_rating: s.user_rating,
             disc_number: s.disc_number,
+            play_count: s.play_count,
+            created: s.created,
         })
         .collect())
 }
@@ -624,6 +626,24 @@ pub async fn search_all(
         albums,
         songs,
     })
+}
+
+#[tauri::command]
+pub async fn get_all_tracks(
+    state: tauri::State<'_, Arc<AppState>>,
+    offset: Option<i32>,
+    limit: Option<i32>,
+    sort_field: Option<String>,
+    sort_dir: Option<String>,
+) -> Result<Vec<FlatSong>, String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.get_all_tracks(
+        offset.unwrap_or(0),
+        limit.unwrap_or(50),
+        sort_field.as_deref().unwrap_or("title"),
+        sort_dir.as_deref().unwrap_or("asc"),
+    )
 }
 
 #[tauri::command]

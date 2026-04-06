@@ -83,9 +83,15 @@ impl CacheDb {
             )
             .map_err(|e| format!("Schema error: {}", e))?;
 
-        // Migrate existing databases: add user_rating to albums if missing
+        // Migrate existing databases: add columns if missing
         self.conn
             .execute_batch("ALTER TABLE albums ADD COLUMN user_rating INTEGER DEFAULT 0")
+            .ok();
+        self.conn
+            .execute_batch("ALTER TABLE tracks ADD COLUMN play_count INTEGER DEFAULT 0")
+            .ok();
+        self.conn
+            .execute_batch("ALTER TABLE tracks ADD COLUMN created TEXT")
             .ok();
 
         // Rebuild FTS indexes so existing caches get populated
@@ -171,8 +177,8 @@ impl CacheDb {
     pub fn upsert_track(&self, s: &Song) -> Result<(), String> {
         self.conn
             .execute(
-                "INSERT INTO tracks (id, title, album, album_id, artist, artist_id, track_num, year, genre, duration, bit_rate, cover_art, user_rating, disc_number)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                "INSERT INTO tracks (id, title, album, album_id, artist, artist_id, track_num, year, genre, duration, bit_rate, cover_art, user_rating, disc_number, play_count, created)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
                  ON CONFLICT(id) DO UPDATE SET
                    title = excluded.title,
                    album = excluded.album,
@@ -190,11 +196,13 @@ impl CacheDb {
                      THEN excluded.user_rating
                      ELSE tracks.user_rating
                    END,
-                   disc_number = excluded.disc_number",
+                   disc_number = excluded.disc_number,
+                   play_count = COALESCE(excluded.play_count, tracks.play_count),
+                   created = COALESCE(excluded.created, tracks.created)",
                 params![
                     s.id, s.title, s.album, s.album_id, s.artist, s.artist_id,
                     s.track, s.year, s.genre, s.duration, s.bit_rate,
-                    s.cover_art, s.user_rating, s.disc_number
+                    s.cover_art, s.user_rating, s.disc_number, s.play_count, s.created
                 ],
             )
             .map_err(|e| format!("Insert track error: {}", e))?;
@@ -314,7 +322,7 @@ impl CacheDb {
             .prepare(
                 "SELECT t.id, t.title, t.album, t.album_id, t.artist, t.artist_id,
                         t.track_num, t.year, t.genre, t.duration, t.bit_rate, t.cover_art,
-                        t.user_rating, t.disc_number
+                        t.user_rating, t.disc_number, t.play_count, t.created
                  FROM tracks_fts fts
                  JOIN tracks t ON t.rowid = fts.rowid
                  WHERE tracks_fts MATCH ?1
@@ -339,6 +347,8 @@ impl CacheDb {
                     cover_art: row.get(11)?,
                     user_rating: row.get(12)?,
                     disc_number: row.get(13)?,
+                    play_count: row.get(14)?,
+                    created: row.get(15)?,
                 })
             })
             .map_err(|e| format!("Search query error: {}", e))?;
@@ -360,7 +370,7 @@ impl CacheDb {
             .prepare(
                 "SELECT id, title, album, album_id, artist, artist_id,
                         track_num, year, genre, duration, bit_rate, cover_art,
-                        user_rating, disc_number
+                        user_rating, disc_number, play_count, created
                  FROM tracks
                  WHERE user_rating > 0
                  ORDER BY user_rating DESC, title ASC
@@ -385,6 +395,8 @@ impl CacheDb {
                     cover_art: row.get(11)?,
                     user_rating: row.get(12)?,
                     disc_number: row.get(13)?,
+                    play_count: row.get(14)?,
+                    created: row.get(15)?,
                 })
             })
             .map_err(|e| format!("Query error: {}", e))?;
@@ -493,7 +505,7 @@ impl CacheDb {
             .prepare(
                 "SELECT id, title, album, album_id, artist, artist_id,
                         track_num, year, genre, duration, bit_rate, cover_art,
-                        user_rating, disc_number
+                        user_rating, disc_number, play_count, created
                  FROM tracks WHERE album_id = ?1
                  ORDER BY disc_number, track_num",
             )
@@ -516,6 +528,8 @@ impl CacheDb {
                     cover_art: row.get(11)?,
                     user_rating: row.get(12)?,
                     disc_number: row.get(13)?,
+                    play_count: row.get(14)?,
+                    created: row.get(15)?,
                     size: None,
                     content_type: None,
                     suffix: None,
@@ -572,7 +586,7 @@ impl CacheDb {
             .prepare(
                 "SELECT id, title, album, album_id, artist, artist_id,
                         track_num, year, genre, duration, bit_rate, cover_art,
-                        user_rating, disc_number
+                        user_rating, disc_number, play_count, created
                  FROM tracks
                  WHERE genre = ?1
                  ORDER BY artist, album, track_num
@@ -597,6 +611,70 @@ impl CacheDb {
                     cover_art: row.get(11)?,
                     user_rating: row.get(12)?,
                     disc_number: row.get(13)?,
+                    play_count: row.get(14)?,
+                    created: row.get(15)?,
+                })
+            })
+            .map_err(|e| format!("Query error: {}", e))?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(|e| format!("Row error: {}", e))?);
+        }
+        Ok(results)
+    }
+
+    pub fn get_all_tracks(
+        &self,
+        offset: i32,
+        limit: i32,
+        sort_field: &str,
+        sort_dir: &str,
+    ) -> Result<Vec<FlatSong>, String> {
+        let col = match sort_field {
+            "title" => "title",
+            "artist" => "artist",
+            "user_rating" => "user_rating",
+            "play_count" => "play_count",
+            "created" => "created",
+            _ => "title",
+        };
+        let dir = if sort_dir == "desc" { "DESC" } else { "ASC" };
+
+        let sql = format!(
+            "SELECT id, title, album, album_id, artist, artist_id,
+                    track_num, year, genre, duration, bit_rate, cover_art,
+                    user_rating, disc_number, play_count, created
+             FROM tracks
+             ORDER BY {} {} NULLS LAST, title ASC
+             LIMIT ?1 OFFSET ?2",
+            col, dir
+        );
+
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(|e| format!("Prepare error: {}", e))?;
+
+        let rows = stmt
+            .query_map(params![limit, offset], |row| {
+                Ok(FlatSong {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    album: row.get(2)?,
+                    album_id: row.get(3)?,
+                    artist: row.get(4)?,
+                    artist_id: row.get(5)?,
+                    track: row.get(6)?,
+                    year: row.get(7)?,
+                    genre: row.get(8)?,
+                    duration: row.get(9)?,
+                    bit_rate: row.get(10)?,
+                    cover_art: row.get(11)?,
+                    user_rating: row.get(12)?,
+                    disc_number: row.get(13)?,
+                    play_count: row.get(14)?,
+                    created: row.get(15)?,
                 })
             })
             .map_err(|e| format!("Query error: {}", e))?;

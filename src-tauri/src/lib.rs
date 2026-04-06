@@ -180,6 +180,7 @@ pub fn run() {
             commands::move_in_queue,
             commands::remove_from_queue,
             commands::jump_to_in_queue,
+            commands::get_all_tracks,
             commands::get_cached_tracks_by_rating,
             commands::sync_library,
             commands::search_local,

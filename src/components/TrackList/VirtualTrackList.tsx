@@ -27,7 +27,16 @@ export function flatSongToSong(f: FlatSong): Song {
     cover_art: f.cover_art,
     user_rating: f.user_rating,
     disc_number: f.disc_number,
+    play_count: f.play_count,
+    created: f.created,
   };
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function formatDuration(secs?: number): string {
@@ -35,6 +44,45 @@ export function formatDuration(secs?: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ---------------------------------------------------------------------------
+// Sort header
+// ---------------------------------------------------------------------------
+
+function SortHeader({
+  field,
+  label,
+  className,
+  sortField,
+  sortDirection,
+  onSortChange,
+}: {
+  field: string;
+  label: string;
+  className?: string;
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
+  onSortChange?: (field: string) => void;
+}) {
+  if (!onSortChange) return <span className={className}>{label}</span>;
+
+  const active = sortField === field;
+  return (
+    <button
+      onClick={() => onSortChange(field)}
+      className={`${className ?? ''} bg-transparent border-0 p-0 cursor-pointer flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide ${active ? 'text-themed-primary' : 'text-themed-muted hover:text-themed-secondary'}`}
+    >
+      {label}
+      {active && (
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+          {sortDirection === 'asc'
+            ? <path d="M5 2L8 7H2L5 2Z" />
+            : <path d="M5 8L2 3H8L5 8Z" />}
+        </svg>
+      )}
+    </button>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -49,6 +97,8 @@ interface TrackRowProps {
   isCurrentTrack: boolean;
   isPlaying: boolean;
   showBitRate?: boolean;
+  showPlayCount?: boolean;
+  showAdded?: boolean;
   focused: boolean;
   onPlay: (index: number) => void;
   onRatingChange: (trackId: string, rating: number) => void;
@@ -66,6 +116,8 @@ const TrackRow = memo(function TrackRow({
   isCurrentTrack,
   isPlaying,
   showBitRate,
+  showPlayCount,
+  showAdded,
   focused,
   onPlay,
   onRatingChange,
@@ -135,6 +187,16 @@ const TrackRow = memo(function TrackRow({
           size="sm"
         />
       </span>
+      {showPlayCount && (
+        <span className="w-16 text-right text-[11px] tabular-nums text-themed-muted">
+          {track.play_count ?? 0}
+        </span>
+      )}
+      {showAdded && (
+        <span className="w-24 text-right text-[11px] truncate text-themed-muted">
+          {formatDate(track.created)}
+        </span>
+      )}
       <span className="w-14 text-right text-[11px] tabular-nums text-themed-muted">
         {formatDuration(track.duration)}
       </span>
@@ -148,6 +210,8 @@ const TrackRow = memo(function TrackRow({
   prev.isCurrentTrack === next.isCurrentTrack &&
   prev.isPlaying === next.isPlaying &&
   prev.showBitRate === next.showBitRate &&
+  prev.showPlayCount === next.showPlayCount &&
+  prev.showAdded === next.showAdded &&
   prev.focused === next.focused
 );
 
@@ -162,8 +226,13 @@ interface VirtualTrackListProps {
   subtitle?: (count: number, hasMore: boolean) => string;
   emptyContent: React.ReactNode;
   showBitRate?: boolean;
+  showPlayCount?: boolean;
+  showAdded?: boolean;
   /** When true, setting a rating to 0 removes the track from the list. */
   removeOnZeroRating?: boolean;
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
+  onSortChange?: (field: string) => void;
 }
 
 export function VirtualTrackList({
@@ -173,7 +242,12 @@ export function VirtualTrackList({
   subtitle,
   emptyContent,
   showBitRate,
+  showPlayCount,
+  showAdded,
   removeOnZeroRating,
+  sortField,
+  sortDirection,
+  onSortChange,
 }: VirtualTrackListProps) {
   const [tracks, setTracks] = useState<FlatSong[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -328,11 +402,13 @@ export function VirtualTrackList({
 
       <div className="flex items-center gap-3 px-6 py-2 text-[11px] font-semibold uppercase tracking-wide text-themed-muted border-b border-themed bg-themed-primary sticky top-0 z-10">
         <span className="w-10 text-right tabular-nums">#</span>
-        <span className="flex-1 min-w-0">Title</span>
-        <span className="w-36 min-w-0">Artist</span>
+        <SortHeader field="title" label="Title" className="flex-1 min-w-0" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
+        <SortHeader field="artist" label="Artist" className="w-36 min-w-0" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
         <span className="w-36 min-w-0">Album</span>
         {showBitRate && <span className="w-14 text-right">kbps</span>}
-        <span className="w-24">Rating</span>
+        <SortHeader field="user_rating" label="Rating" className="w-24" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
+        {showPlayCount && <SortHeader field="play_count" label="Plays" className="w-16 text-right" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />}
+        {showAdded && <SortHeader field="created" label="Added" className="w-24 text-right" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />}
         <span className="w-14 text-right">Time</span>
       </div>
 
@@ -377,6 +453,8 @@ export function VirtualTrackList({
                 isCurrentTrack={currentTrack?.id === track.id}
                 isPlaying={isPlaying}
                 showBitRate={showBitRate}
+                showPlayCount={showPlayCount}
+                showAdded={showAdded}
                 focused={focusIndex === virtualRow.index}
                 onPlay={handlePlay}
                 onRatingChange={handleRatingChange}

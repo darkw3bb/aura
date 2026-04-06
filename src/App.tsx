@@ -9,6 +9,7 @@ import { ArtistDetail } from './components/Library/ArtistDetail';
 import { PlayerBar } from './components/Player/PlayerBar';
 import { SearchOverlay } from './components/Search/SearchOverlay';
 import { RatedTracks } from './components/TrackList/RatedTracks';
+import { AllTracks } from './components/TrackList/AllTracks';
 import { GenreList } from './components/Library/GenreList';
 import { GenreTracks } from './components/TrackList/GenreTracks';
 import { QueuePanel } from './components/Queue/QueuePanel';
@@ -90,6 +91,20 @@ function App() {
                   }
                 >
                   Albums
+                </NavButton>
+
+                <NavButton
+                  active={view === 'tracks'}
+                  onClick={() => setView('tracks')}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18V5l12-2v13" />
+                      <circle cx="6" cy="18" r="3" />
+                      <circle cx="18" cy="16" r="3" />
+                    </svg>
+                  }
+                >
+                  Tracks
                 </NavButton>
 
                 <NavButton
@@ -219,6 +234,7 @@ function App() {
             {view === 'albums' && <AlbumGrid />}
             {view === 'album-detail' && <AlbumDetail />}
             {view === 'artist-detail' && <ArtistDetail />}
+            {view === 'tracks' && <AllTracks />}
             {view === 'rated' && <RatedTracks />}
             {view === 'genres' && <GenreList />}
             {view === 'genre-detail' && <GenreTracks />}

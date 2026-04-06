@@ -62,6 +62,8 @@ export interface Song {
   cover_art?: string;
   user_rating?: number;
   disc_number?: number;
+  play_count?: number;
+  created?: string;
 }
 
 export interface FlatSong {
@@ -81,6 +83,8 @@ export interface FlatSong {
   cover_art?: string;
   user_rating?: number;
   disc_number?: number;
+  play_count?: number;
+  created?: string;
 }
 
 export interface SearchResult {
@@ -168,6 +172,8 @@ export const api = {
   syncLibrary: () => invoke<string>('sync_library'),
   searchLocal: (query: string) => invoke<FlatSong[]>('search_local', { query }),
   searchAll: (query: string) => invoke<LocalSearchResult>('search_all', { query }),
+  getAllTracks: (offset?: number, limit?: number, sortField?: string, sortDir?: string) =>
+    invoke<FlatSong[]>('get_all_tracks', { offset, limit, sortField, sortDir }),
   getCachedTracksByRating: (offset?: number, limit?: number) =>
     invoke<FlatSong[]>('get_cached_tracks_by_rating', { offset, limit }),
 };

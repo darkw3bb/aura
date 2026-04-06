@@ -166,6 +166,9 @@ pub struct Song {
     pub user_rating: Option<i32>,
     #[serde(alias = "discNumber")]
     pub disc_number: Option<i32>,
+    #[serde(alias = "playCount")]
+    pub play_count: Option<i64>,
+    pub created: Option<String>,
 }
 
 // -- Search --
@@ -277,4 +280,6 @@ pub struct FlatSong {
     pub cover_art: Option<String>,
     pub user_rating: Option<i32>,
     pub disc_number: Option<i32>,
+    pub play_count: Option<i64>,
+    pub created: Option<String>,
 }
