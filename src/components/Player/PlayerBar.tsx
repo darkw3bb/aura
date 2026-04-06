@@ -19,7 +19,7 @@ export function PlayerBar() {
   } = usePlayerStore();
 
   const { loadArtist, loadAlbum } = useLibraryStore();
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   useEffect(() => {
     intervalRef.current = setInterval(refreshState, 1000);

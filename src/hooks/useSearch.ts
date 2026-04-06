@@ -15,7 +15,7 @@ export function useSearch() {
   const [results, setResults] = useState<SearchResults>(emptyResults);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const reqIdRef = useRef(0);
   const genreCacheRef = useRef<Genre[] | null>(null);
 

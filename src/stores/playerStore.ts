@@ -312,7 +312,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         currentTrack: skipping
           ? s.currentTrack
           : state.currentTrack
-            ? { ...s.currentTrack, ...Object.fromEntries(Object.entries(state.currentTrack).filter(([, v]) => v !== undefined && v !== null)) }
+            ? { ...s.currentTrack, ...Object.fromEntries(Object.entries(state.currentTrack).filter(([, v]) => v !== undefined && v !== null)) } as Song
             : s.currentTrack,
         elapsedSecs: skipping ? s.elapsedSecs : state.elapsedSecs,
         durationSecs: state.durationSecs ?? null,
