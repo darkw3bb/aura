@@ -56,7 +56,7 @@ function App() {
           <div className="w-56 shrink-0 flex flex-col overflow-hidden bg-themed-secondary border-r border-themed">
             <div className="px-4 pt-6 pb-1">
               <h1 className="text-[13px] font-bold tracking-tight text-themed-primary">
-                Audio Engine
+                Aura
               </h1>
             </div>
 

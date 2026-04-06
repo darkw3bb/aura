@@ -81,7 +81,9 @@ export function RatedTracks() {
     try {
       await setRating(trackId, rating);
       setTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, user_rating: rating } : t))
+        rating === 0
+          ? prev.filter((t) => t.id !== trackId)
+          : prev.map((t) => (t.id === trackId ? { ...t, user_rating: rating } : t))
       );
     } catch (e) {
       console.error('Failed to save rating:', e);

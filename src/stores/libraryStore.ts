@@ -24,9 +24,11 @@ interface LibraryStore {
   loadAlbum: (id: string) => Promise<void>;
   loadArtist: (id: string) => Promise<void>;
   syncLibrary: () => Promise<void>;
+  updateTrackRating: (trackId: string, rating: number) => void;
+  updateAlbumRating: (albumId: string, rating: number) => void;
 }
 
-export const useLibraryStore = create<LibraryStore>((set) => ({
+export const useLibraryStore = create<LibraryStore>((set, get) => ({
   connected: false,
   serverUrl: '',
   view: 'settings',
@@ -101,6 +103,43 @@ export const useLibraryStore = create<LibraryStore>((set) => ({
       set({ syncing: false, syncMessage: msg });
     } catch (e) {
       set({ syncing: false, syncMessage: `Sync failed: ${e}` });
+    }
+  },
+
+  updateTrackRating: (trackId: string, rating: number) => {
+    const patchSongs = (songs: AlbumDetail['song']) =>
+      songs?.map((s) => (s.id === trackId ? { ...s, user_rating: rating } : s));
+
+    const { selectedAlbum, artistAlbums } = get();
+
+    if (selectedAlbum?.song?.some((s) => s.id === trackId)) {
+      set({ selectedAlbum: { ...selectedAlbum, song: patchSongs(selectedAlbum.song) } });
+    }
+
+    if (artistAlbums.some((a) => a.song?.some((s) => s.id === trackId))) {
+      set({
+        artistAlbums: artistAlbums.map((a) =>
+          a.song?.some((s) => s.id === trackId)
+            ? { ...a, song: patchSongs(a.song) }
+            : a
+        ),
+      });
+    }
+  },
+
+  updateAlbumRating: (albumId: string, rating: number) => {
+    const { selectedAlbum, artistAlbums } = get();
+
+    if (selectedAlbum?.id === albumId) {
+      set({ selectedAlbum: { ...selectedAlbum, user_rating: rating } });
+    }
+
+    if (artistAlbums.some((a) => a.id === albumId)) {
+      set({
+        artistAlbums: artistAlbums.map((a) =>
+          a.id === albumId ? { ...a, user_rating: rating } : a
+        ),
+      });
     }
   },
 }));

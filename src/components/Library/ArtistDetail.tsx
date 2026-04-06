@@ -1,5 +1,6 @@
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
 import type { AlbumDetail, Song } from '../../lib/tauri';
@@ -12,8 +13,17 @@ function formatDuration(secs?: number): string {
 }
 
 export function ArtistDetail() {
-  const { selectedArtist, artistAlbums, setView } = useLibraryStore();
+  const { selectedArtist, artistAlbums, setView, updateAlbumRating } = useLibraryStore();
   const { playTrackInContext, setRating } = usePlayerStore();
+
+  const handleAlbumRating = async (albumId: string, rating: number) => {
+    try {
+      await api.setRating(albumId, rating);
+      updateAlbumRating(albumId, rating);
+    } catch (e) {
+      console.error('Failed to save album rating:', e);
+    }
+  };
 
   if (!selectedArtist) return null;
 
@@ -54,6 +64,7 @@ export function ArtistDetail() {
             album={album}
             onPlayTrack={(songs, index) => playTrackInContext(songs, index)}
             onRate={(id, r) => setRating(id, r)}
+            onAlbumRate={(r) => handleAlbumRating(album.id, r)}
           />
         ))}
       </div>
@@ -65,10 +76,12 @@ function AlbumSection({
   album,
   onPlayTrack,
   onRate,
+  onAlbumRate,
 }: {
   album: AlbumDetail;
   onPlayTrack: (songs: Song[], index: number) => void;
   onRate: (trackId: string, rating: number) => void;
+  onAlbumRate: (rating: number) => void;
 }) {
   const { currentTrack, isPlaying } = usePlayerStore();
   const { loadArtist } = useLibraryStore();
@@ -93,6 +106,13 @@ function AlbumSection({
             {songs.length} track{songs.length !== 1 ? 's' : ''}
             {album.genre && ` \u00b7 ${album.genre}`}
           </p>
+          <div className="mt-1">
+            <StarRating
+              rating={album.user_rating ?? 0}
+              onChange={onAlbumRate}
+              size="sm"
+            />
+          </div>
         </div>
       </div>
 

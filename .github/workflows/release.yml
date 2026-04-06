@@ -65,7 +65,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Audio Engine ${{ github.ref_name }}
+          releaseName: Aura ${{ github.ref_name }}
           releaseBody: 'See the assets below for download links.'
           releaseDraft: true
           prerelease: false

@@ -1,13 +1,13 @@
 [package]
-name = "audio-engine"
+name = "aura"
 version = "0.1.0"
 description = "A blazingly fast Navidrome/Subsonic desktop music player"
-authors = ["Audio Engine Contributors"]
+authors = ["Aura Contributors"]
 license = "MIT"
 edition = "2021"
 
 [lib]
-name = "audio_engine_lib"
+name = "aura_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

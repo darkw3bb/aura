@@ -40,7 +40,7 @@ impl SubsonicClient {
         params.insert("t".to_string(), token);
         params.insert("s".to_string(), salt);
         params.insert("v".to_string(), "1.16.1".to_string());
-        params.insert("c".to_string(), "audio-engine".to_string());
+        params.insert("c".to_string(), "aura".to_string());
         params.insert("f".to_string(), "json".to_string());
         params
     }

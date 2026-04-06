@@ -104,6 +104,8 @@ pub struct Album {
     pub year: Option<i32>,
     pub genre: Option<String>,
     pub created: Option<String>,
+    #[serde(alias = "userRating")]
+    pub user_rating: Option<i32>,
 }
 
 // -- Album detail --
@@ -131,6 +133,8 @@ pub struct AlbumDetail {
     pub year: Option<i32>,
     pub genre: Option<String>,
     pub song: Option<Vec<Song>>,
+    #[serde(alias = "userRating")]
+    pub user_rating: Option<i32>,
 }
 
 // -- Songs --

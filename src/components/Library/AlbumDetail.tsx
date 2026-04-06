@@ -1,5 +1,6 @@
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
 
@@ -11,8 +12,18 @@ function formatDuration(secs?: number): string {
 }
 
 export function AlbumDetail() {
-  const { selectedAlbum, setView, loadArtist } = useLibraryStore();
+  const { selectedAlbum, setView, loadArtist, updateAlbumRating } = useLibraryStore();
   const { playTrackInContext, setRating, currentTrack, isPlaying } = usePlayerStore();
+
+  const handleAlbumRating = async (rating: number) => {
+    if (!selectedAlbum) return;
+    try {
+      await api.setRating(selectedAlbum.id, rating);
+      updateAlbumRating(selectedAlbum.id, rating);
+    } catch (e) {
+      console.error('Failed to save album rating:', e);
+    }
+  };
 
   if (!selectedAlbum) return null;
 
@@ -56,6 +67,13 @@ export function AlbumDetail() {
             {songs.length} track{songs.length !== 1 ? 's' : ''}
             {selectedAlbum.genre && ` \u00b7 ${selectedAlbum.genre}`}
           </p>
+          <div className="mt-2">
+            <StarRating
+              rating={selectedAlbum.user_rating ?? 0}
+              onChange={handleAlbumRating}
+              size="md"
+            />
+          </div>
           <button
             onClick={() => {
               if (songs.length > 0) playTrackInContext(songs, 0);

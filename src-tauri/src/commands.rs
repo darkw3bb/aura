@@ -38,7 +38,7 @@ pub async fn connect(
 
     let cache_dir = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("audio-engine");
+        .join("aura");
     let cache = CacheDb::open(&cache_dir)?;
 
     *state.client.lock() = Some(client);

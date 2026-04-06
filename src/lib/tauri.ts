@@ -26,6 +26,7 @@ export interface Album {
   duration?: number;
   year?: number;
   genre?: string;
+  user_rating?: number;
 }
 
 export interface AlbumDetail {
@@ -39,6 +40,7 @@ export interface AlbumDetail {
   year?: number;
   genre?: string;
   song?: Song[];
+  user_rating?: number;
 }
 
 export interface Song {

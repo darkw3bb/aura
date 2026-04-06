@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../lib/tauri';
 import type { Song, PlaybackState } from '../lib/tauri';
+import { useLibraryStore } from './libraryStore';
 
 interface PlayerStore {
   isPlaying: boolean;
@@ -180,5 +181,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     if (current && current.id === trackId) {
       set({ currentTrack: { ...current, user_rating: rating } });
     }
+    useLibraryStore.getState().updateTrackRating(trackId, rating);
   },
 }));

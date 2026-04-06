@@ -12,15 +12,15 @@ impl MediaControlManager {
     pub fn new() -> Self {
         #[cfg(not(target_os = "windows"))]
         let config = PlatformConfig {
-            dbus_name: "audio_engine",
-            display_name: "Audio Engine",
+            dbus_name: "aura",
+            display_name: "Aura",
             hwnd: None,
         };
 
         #[cfg(target_os = "windows")]
         let config = PlatformConfig {
-            dbus_name: "audio_engine",
-            display_name: "Audio Engine",
+            dbus_name: "aura",
+            display_name: "Aura",
             hwnd: None,
         };
 

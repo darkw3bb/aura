@@ -1,6 +1,6 @@
 # Track List Views
 
-Audio Engine uses several distinct track list views, each tailored to a specific
+Aura uses several distinct track list views, each tailored to a specific
 browsing context. Navigation between views is driven by `libraryStore.view`
 (Zustand state) rather than URL routes. Search is the exception — it renders as a
 modal overlay toggled by `searchOpen` state in `App.tsx`.
@@ -12,9 +12,9 @@ modal overlay toggled by `searchOpen` state in `App.tsx`.
 
 | View              | Component                   | Opened via              | Columns / fields                       | Key behaviour                                    |
 | ----------------- | --------------------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
-| **Rated**         | `TrackList/RatedTracks.tsx` | Sidebar "Rated"         | #, Title, Artist, Album, Rating, Time  | Virtualised infinite scroll; inline star editing |
-| **Album Detail**  | `Library/AlbumDetail.tsx`   | Click any album         | #, Title, (feat. artist), Rating, Time | Album header with cover art; Play All button     |
-| **Artist Detail** | `Library/ArtistDetail.tsx`  | Click any artist        | Per album: #, Title, Rating, Time      | Tracks grouped by album; Play All across albums  |
+| **Rated**         | `TrackList/RatedTracks.tsx` | Sidebar "Rated"         | #, Title, Artist, Album, kbps, Rating, Time  | Virtualised infinite scroll; inline star editing |
+| **Album Detail**  | `Library/AlbumDetail.tsx`   | Click any album         | #, Title, (feat. artist), kbps, Rating, Time | Album header with cover art; Play All button     |
+| **Artist Detail** | `Library/ArtistDetail.tsx`  | Click any artist        | Per album: #, Title, Artist, kbps, Rating, Time | Tracks grouped by album; Play All across albums  |
 | **Search**        | `Search/SearchOverlay.tsx`  | Sidebar "Search" / `⌘K` | Cover art, Title, Artist · Album, Time | Overlay with debounced search; single-click play |
 
 
@@ -39,6 +39,7 @@ A sticky column-header row sits above a scrollable track list:
 | **Title**  | flex    | Track title — accent-coloured when currently playing     |
 | **Artist** | 9 rem   | Clickable link that navigates to Artist Detail           |
 | **Album**  | 9 rem   | Clickable link that navigates to Album Detail            |
+| **kbps**   | 3.5 rem | Bitrate from `bit_rate` field, displayed as e.g. "320k"  |
 | **Rating** | 6 rem   | Interactive `StarRating` — editable inline               |
 | **Time**   | 3.5 rem | Duration formatted as `m:ss`                             |
 
@@ -87,6 +88,7 @@ There is no column-header row. Each row contains:
 | **#**               | `song.track` number from metadata (falls back to list index); EQ bars when playing                                        |
 | **Title**           | Track title — accent-coloured when currently playing                                                                      |
 | **Featured artist** | Shown as a second line *only* when the track artist differs from the album artist; clickable to navigate to Artist Detail |
+| **kbps**            | Bitrate displayed as e.g. "320k"; empty when not available                                                                |
 | **Rating**          | Interactive `StarRating`                                                                                                  |
 | **Time**            | Duration formatted as `m:ss`                                                                                              |
 
@@ -125,15 +127,14 @@ Tracks are **grouped by album**. Each section contains:
 ### Track rows (per album section)
 
 
-| Element    | Content                                                          |
-| ---------- | ---------------------------------------------------------------- |
-| **#**      | Track number from metadata (or list index); EQ bars when playing |
-| **Title**  | Track title — accent-coloured when currently playing             |
-| **Rating** | Interactive `StarRating`                                         |
-| **Time**   | Duration formatted as `m:ss`                                     |
-
-
-There is no Artist column — the artist is the page itself.
+| Element    | Content                                                               |
+| ---------- | --------------------------------------------------------------------- |
+| **#**      | Track number from metadata (or list index); EQ bars when playing      |
+| **Title**  | Track title — accent-coloured when currently playing                  |
+| **Artist** | Clickable link that navigates to Artist Detail (useful for feat. acts) |
+| **kbps**   | Bitrate displayed as e.g. "320k"; empty when not available            |
+| **Rating** | Interactive `StarRating`                                              |
+| **Time**   | Duration formatted as `m:ss`                                          |
 
 ### Behaviour
 

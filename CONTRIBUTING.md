@@ -1,4 +1,4 @@
-# Contributing to Audio Engine
+# Contributing to Aura
 
 Thanks for your interest in contributing! Here's how to get started.
 
@@ -9,8 +9,8 @@ Thanks for your interest in contributing! Here's how to get started.
 2. **Clone and install:**
 
 ```bash
-git clone https://github.com/yourname/audio-engine.git
-cd audio-engine
+git clone https://github.com/yourname/aura.git
+cd aura
 npm install
 ```
 
@@ -51,7 +51,7 @@ npx tauri build
 
 ## Reporting Issues
 
-- Include your OS, Navidrome version, and Audio Engine version.
+- Include your OS, Navidrome version, and Aura version.
 - Include steps to reproduce the issue.
 - Include any error messages from the console or terminal.
 

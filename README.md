@@ -1,4 +1,4 @@
-# Audio Engine
+# Aura
 
 A blazingly fast, cross-platform desktop music player for [Navidrome](https://navidrome.org/) and Subsonic-compatible servers.
 
@@ -44,8 +44,8 @@ sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourname/audio-engine.git
-cd audio-engine
+git clone https://github.com/yourname/aura.git
+cd aura
 
 # Install frontend dependencies
 npm install
