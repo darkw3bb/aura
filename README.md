@@ -87,6 +87,8 @@ src/                 React + TypeScript frontend
 
 | Shortcut | Action |
 |----------|--------|
+| `J` / `K` | Move focus down / up in lists and grids |
+| `Enter` | Activate focused item (open album, play track) |
 | `Cmd/Ctrl + K` | Open search |
 | `Cmd/Ctrl + [` | Navigate back |
 | `Cmd/Ctrl + ]` | Navigate forward |
@@ -115,7 +117,7 @@ src/                 React + TypeScript frontend
 - [ ] Synced lyrics (LRCLIB)
 - [ ] Last.fm / ListenBrainz scrobbling
 - [ ] Audio equalizer
-- [ ] Vim-style keyboard navigation
+- [x] Vim-style keyboard navigation
 - [ ] Waveform seekbar
 - [ ] Mini player mode
 - [ ] Multiple server support

@@ -152,7 +152,8 @@
   .row-hover {
     transition: background-color 150ms ease;
   }
-  .row-hover:hover {
+  .row-hover:hover,
+  .row-hover[data-focused="true"] {
     background: var(--bg-hover);
   }
 
@@ -183,7 +184,8 @@
     border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
   }
   .track-row:hover,
-  .track-row-active {
+  .track-row-active,
+  .track-row[data-focused="true"] {
     background: var(--bg-hover);
   }
   .track-row:last-child {

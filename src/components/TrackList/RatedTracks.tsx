@@ -4,6 +4,7 @@ import { api } from '../../lib/tauri';
 import type { FlatSong } from '../../lib/tauri';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../stores/libraryStore';
+import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { StarRating } from '../Rating/StarRating';
 
 function formatDuration(secs?: number): string {
@@ -77,6 +78,22 @@ export function RatedTracks() {
     }
   }, [rowVirtualizer.getVirtualItems(), tracks.length, hasMore, loading, loadMore]);
 
+  const scrollToIndex = useCallback(
+    (i: number) => rowVirtualizer.scrollToIndex(i, { align: 'auto' }),
+    [rowVirtualizer],
+  );
+
+  const onActivate = useCallback(
+    (i: number) => { if (tracks[i]) playTrackInContext(tracks.map(flatSongToSong), i); },
+    [tracks, playTrackInContext],
+  );
+
+  const { getItemProps, handleMouseMove } = useKeyboardNav({
+    itemCount: tracks.length,
+    onActivate,
+    scrollToIndex,
+  });
+
   const handleRatingChange = async (trackId: string, rating: number) => {
     try {
       await setRating(trackId, rating);
@@ -122,7 +139,7 @@ export function RatedTracks() {
         <span className="w-14 text-right">Time</span>
       </div>
 
-      <div ref={parentRef} className="flex-1 overflow-y-auto">
+      <div ref={parentRef} className="flex-1 overflow-y-auto" onMouseMove={handleMouseMove}>
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -164,6 +181,7 @@ export function RatedTracks() {
                 }}
                 className="track-row flex items-center gap-3 px-6 cursor-pointer"
                 onDoubleClick={() => playTrackInContext(tracks.map(flatSongToSong), virtualRow.index)}
+                {...getItemProps(virtualRow.index)}
               >
                 <span className="w-10 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
                   {currentTrack?.id === track.id ? (

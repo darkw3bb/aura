@@ -1,26 +1,39 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { api } from '../../lib/tauri';
 import type { Album } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 
 export function AlbumGrid() {
   const { albums, loadAlbums, loadAlbum, loadArtist } = useLibraryStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadAlbums('recent');
   }, [loadAlbums]);
 
+  const onActivate = useCallback(
+    (i: number) => { if (albums[i]) loadAlbum(albums[i].id); },
+    [albums, loadAlbum],
+  );
+
+  const { getItemProps, handleMouseMove } = useKeyboardNav({
+    itemCount: albums.length,
+    onActivate,
+    scrollRef,
+  });
+
   return (
-    <div className="p-6 overflow-y-auto h-full">
+    <div ref={scrollRef} className="p-6 overflow-y-auto h-full" onMouseMove={handleMouseMove}>
       <h2 className="text-lg font-semibold mb-4 text-themed-primary">Recently Played</h2>
       {albums.length === 0 ? (
         <p className="text-themed-secondary text-sm">Albums will appear here as you listen.</p>
       ) : (
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(156px, 1fr))' }}>
-          {albums.map((album) => (
-            <AlbumCard key={album.id} album={album} onClick={() => loadAlbum(album.id)} onArtistClick={album.artist_id ? () => loadArtist(album.artist_id!) : undefined} />
+          {albums.map((album, i) => (
+            <AlbumCard key={album.id} album={album} onClick={() => loadAlbum(album.id)} onArtistClick={album.artist_id ? () => loadArtist(album.artist_id!) : undefined} itemProps={getItemProps(i)} />
           ))}
         </div>
       )}
@@ -36,11 +49,12 @@ async function playAlbum(albumId: string) {
   }
 }
 
-function AlbumCard({ album, onClick, onArtistClick }: { album: Album; onClick: () => void; onArtistClick?: () => void }) {
+function AlbumCard({ album, onClick, onArtistClick, itemProps }: { album: Album; onClick: () => void; onArtistClick?: () => void; itemProps?: Record<string, unknown> }) {
   return (
     <div
       onClick={onClick}
       className="group row-hover text-left rounded-lg p-2.5 cursor-pointer bg-themed-secondary"
+      {...itemProps}
     >
       <div className="relative mb-2">
         <CoverArt coverArt={album.cover_art} artist={album.artist} albumName={album.name} size={300} className="w-full aspect-square rounded-md" />

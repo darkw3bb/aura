@@ -1,5 +1,7 @@
+import { useCallback, useRef } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
@@ -15,6 +17,20 @@ function formatDuration(secs?: number): string {
 export function ArtistDetail() {
   const { selectedArtist, artistAlbums, goBack, updateAlbumRating } = useLibraryStore();
   const { playTrackInContext, setRating } = usePlayerStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const allSongs = artistAlbums.flatMap((a) => a.song ?? []);
+
+  const onActivate = useCallback(
+    (i: number) => { if (allSongs[i]) playTrackInContext(allSongs, i); },
+    [allSongs, playTrackInContext],
+  );
+
+  const { getItemProps, handleMouseMove } = useKeyboardNav({
+    itemCount: allSongs.length,
+    onActivate,
+    scrollRef,
+  });
 
   const handleAlbumRating = async (albumId: string, rating: number) => {
     try {
@@ -27,10 +43,10 @@ export function ArtistDetail() {
 
   if (!selectedArtist) return null;
 
-  const allSongs = artistAlbums.flatMap((a) => a.song ?? []);
+  let flatOffset = 0;
 
   return (
-    <div className="p-6 overflow-y-auto h-full">
+    <div ref={scrollRef} className="p-6 overflow-y-auto h-full" onMouseMove={handleMouseMove}>
       <button
         onClick={goBack}
         className="nav-item text-[13px] mb-4 cursor-pointer bg-transparent border-0 px-0"
@@ -57,15 +73,21 @@ export function ArtistDetail() {
       </div>
 
       <div className="flex flex-col gap-8">
-        {artistAlbums.map((album) => (
-          <AlbumSection
-            key={album.id}
-            album={album}
-            onPlayTrack={(songs, index) => playTrackInContext(songs, index)}
-            onRate={(id, r) => setRating(id, r)}
-            onAlbumRate={(r) => handleAlbumRating(album.id, r)}
-          />
-        ))}
+        {artistAlbums.map((album) => {
+          const sectionOffset = flatOffset;
+          flatOffset += (album.song ?? []).length;
+          return (
+            <AlbumSection
+              key={album.id}
+              album={album}
+              flatOffset={sectionOffset}
+              getItemProps={getItemProps}
+              onPlayTrack={(songs, index) => playTrackInContext(songs, index)}
+              onRate={(id, r) => setRating(id, r)}
+              onAlbumRate={(r) => handleAlbumRating(album.id, r)}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -73,11 +95,15 @@ export function ArtistDetail() {
 
 function AlbumSection({
   album,
+  flatOffset,
+  getItemProps,
   onPlayTrack,
   onRate,
   onAlbumRate,
 }: {
   album: AlbumDetail;
+  flatOffset: number;
+  getItemProps: (index: number) => Record<string, unknown>;
   onPlayTrack: (songs: Song[], index: number) => void;
   onRate: (trackId: string, rating: number) => void;
   onAlbumRate: (rating: number) => void;
@@ -121,6 +147,7 @@ function AlbumSection({
             key={song.id}
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => onPlayTrack(songs, i)}
+            {...getItemProps(flatOffset + i)}
           >
             <span className="w-8 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
               {currentTrack?.id === song.id ? (

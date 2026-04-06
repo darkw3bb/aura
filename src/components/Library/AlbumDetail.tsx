@@ -1,5 +1,7 @@
+import { useCallback, useRef } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
+import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
@@ -14,6 +16,7 @@ function formatDuration(secs?: number): string {
 export function AlbumDetail() {
   const { selectedAlbum, goBack, loadArtist, updateAlbumRating } = useLibraryStore();
   const { playTrackInContext, setRating, currentTrack, isPlaying } = usePlayerStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleAlbumRating = async (rating: number) => {
     if (!selectedAlbum) return;
@@ -25,12 +28,23 @@ export function AlbumDetail() {
     }
   };
 
+  const songs = selectedAlbum?.song ?? [];
+
+  const onActivate = useCallback(
+    (i: number) => { if (songs[i]) playTrackInContext(songs, i); },
+    [songs, playTrackInContext],
+  );
+
+  const { getItemProps, handleMouseMove } = useKeyboardNav({
+    itemCount: songs.length,
+    onActivate,
+    scrollRef,
+  });
+
   if (!selectedAlbum) return null;
 
-  const songs = selectedAlbum.song ?? [];
-
   return (
-    <div className="p-6 overflow-y-auto h-full">
+    <div ref={scrollRef} className="p-6 overflow-y-auto h-full" onMouseMove={handleMouseMove}>
       <button
         onClick={goBack}
         className="nav-item text-[13px] mb-4 cursor-pointer bg-transparent border-0 px-0"
@@ -91,6 +105,7 @@ export function AlbumDetail() {
             key={song.id}
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => playTrackInContext(songs, i)}
+            {...getItemProps(i)}
           >
             <span className="w-8 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
               {currentTrack?.id === song.id ? (
