@@ -23,7 +23,6 @@
   <a href="https://github.com/darkw3bb/aura/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/darkw3bb/aura/ci.yml?style=flat-square&label=CI" alt="CI status" />
   </a>
-  <img src="https://img.shields.io/badge/vibe%20coded-100%25-7c3aed?style=flat-square" alt="100% vibe coded" />
 </p>
 
 ---
@@ -208,11 +207,9 @@ src/                 React + TypeScript frontend
 
 ---
 
-## Vibe Coded
+## Contributing
 
-This entire project was vibe coded with [Cursor](https://cursor.com/) and AI. Every line of Rust, every React component, every CSS class -- built through human-AI collaboration. No hand-wringing over architecture astronautics, just vibes and iteration.
-
-**Contributions are very welcome!** Whether you're a human, an AI, or somewhere in between -- if you want to improve Aura, open a PR. AI-assisted contributions are not just accepted, they're encouraged. This is how software gets built now.
+Contributions are very welcome! If you want to improve Aura, open a PR.
 
 ---
 
