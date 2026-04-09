@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection, OptionalExtension};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::subsonic::models::{Album, AlbumDetail, Artist, ArtistDetail, FlatSong, Genre, Song};
 
@@ -741,4 +741,25 @@ impl CacheDb {
             .map_err(|e| format!("Update album rating error: {}", e))?;
         Ok(())
     }
+}
+
+pub fn cover_art_path(app_dir: &Path, id: &str, size: i32) -> PathBuf {
+    let safe_id = id.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    app_dir.join("covers").join(format!("{}_{}", safe_id, size))
+}
+
+pub fn read_cached_cover_art(app_dir: &Path, id: &str, size: i32) -> Option<PathBuf> {
+    let path = cover_art_path(app_dir, id, size);
+    if path.exists() { Some(path) } else { None }
+}
+
+pub fn write_cached_cover_art(
+    app_dir: &Path,
+    id: &str,
+    size: i32,
+    bytes: &[u8],
+) -> Result<PathBuf, String> {
+    let path = cover_art_path(app_dir, id, size);
+    std::fs::write(&path, bytes).map_err(|e| format!("Write cover art error: {}", e))?;
+    Ok(path)
 }

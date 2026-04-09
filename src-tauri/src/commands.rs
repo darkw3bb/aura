@@ -1,6 +1,6 @@
 use base64::Engine;
 use crate::audio::streaming::StreamingBuffer;
-use crate::cache::CacheDb;
+use crate::cache::{CacheDb, read_cached_cover_art, write_cached_cover_art};
 use crate::subsonic::client::SubsonicClient;
 use crate::subsonic::models::*;
 use crate::AppState;
@@ -53,8 +53,13 @@ pub async fn connect(
         .join("aura");
     let cache = CacheDb::open(&cache_dir)?;
 
+    let covers_dir = cache_dir.join("covers");
+    std::fs::create_dir_all(&covers_dir)
+        .map_err(|e| format!("Failed to create covers dir: {}", e))?;
+
     *state.client.lock() = Some(client);
     *state.cache.lock() = Some(cache);
+    *state.app_dir.lock() = Some(cache_dir);
 
     Ok(())
 }
@@ -264,14 +269,55 @@ pub async fn fetch_cover_art(
 
 #[tauri::command]
 pub async fn fetch_external_cover_art(
+    state: tauri::State<'_, Arc<AppState>>,
     artist: String,
     album: String,
     size: Option<i32>,
 ) -> Result<String, String> {
-    let (content_type, bytes) =
+    let sz = size.unwrap_or(600);
+    let cache_key = format!("ext_{}_{}", artist, album);
+
+    if let Some(ref app_dir) = *state.app_dir.lock() {
+        if let Some(path) = read_cached_cover_art(app_dir, &cache_key, sz) {
+            let bytes = std::fs::read(&path).map_err(|e| format!("Read cache error: {}", e))?;
+            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            return Ok(format!("data:image/jpeg;base64,{}", b64));
+        }
+    }
+
+    let (_, bytes) =
         crate::subsonic::client::fetch_itunes_cover_art(&artist, &album, size).await?;
+
+    if let Some(ref app_dir) = *state.app_dir.lock() {
+        let _ = write_cached_cover_art(app_dir, &cache_key, sz, &bytes);
+    }
+
     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-    Ok(format!("data:{};base64,{}", content_type, b64))
+    Ok(format!("data:image/jpeg;base64,{}", b64))
+}
+
+#[tauri::command]
+pub async fn get_cover_art_cached(
+    state: tauri::State<'_, Arc<AppState>>,
+    id: String,
+    size: Option<i32>,
+) -> Result<String, String> {
+    let sz = size.unwrap_or(300);
+
+    let app_dir = state.app_dir.lock().clone().ok_or("App dir not initialized")?;
+
+    if let Some(path) = read_cached_cover_art(&app_dir, &id, sz) {
+        let bytes = std::fs::read(&path).map_err(|e| format!("Read cache error: {}", e))?;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        return Ok(format!("data:image/jpeg;base64,{}", b64));
+    }
+
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    let (_, bytes) = client.download_cover_art(&id, Some(sz)).await?;
+
+    let _ = write_cached_cover_art(&app_dir, &id, sz, &bytes);
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:image/jpeg;base64,{}", b64))
 }
 
 // -- Rating --

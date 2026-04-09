@@ -28,10 +28,19 @@ export function CoverArt({ coverArt, artist, albumName, size = 200, className = 
     }
 
     let cancelled = false;
-    api.getCoverArtUrl(coverArt, size).then((url) => {
+    api.getCoverArtCached(coverArt, size).then((dataUri) => {
       if (!cancelled) {
-        urlCache.set(key, url);
-        setSrc(url);
+        urlCache.set(key, dataUri);
+        setSrc(dataUri);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        api.getCoverArtUrl(coverArt, size).then((url) => {
+          if (!cancelled) {
+            urlCache.set(key, url);
+            setSrc(url);
+          }
+        });
       }
     });
 

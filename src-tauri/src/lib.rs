@@ -62,6 +62,7 @@ async fn stream_and_play_bg(
 pub struct AppState {
     pub client: Mutex<Option<SubsonicClient>>,
     pub cache: Mutex<Option<CacheDb>>,
+    pub app_dir: Mutex<Option<std::path::PathBuf>>,
     pub player: Mutex<audio::Player>,
     pub media_controls: Mutex<MediaControlManager>,
 }
@@ -73,6 +74,7 @@ pub fn run() {
     let state = Arc::new(AppState {
         client: Mutex::new(None),
         cache: Mutex::new(None),
+        app_dir: Mutex::new(None),
         player: Mutex::new(audio::Player::new()),
         media_controls: Mutex::new(MediaControlManager::new()),
     });
@@ -162,6 +164,7 @@ pub fn run() {
             commands::get_cover_art_url,
             commands::fetch_cover_art,
             commands::fetch_external_cover_art,
+            commands::get_cover_art_cached,
             commands::set_rating,
             commands::scrobble,
             commands::play_track,
