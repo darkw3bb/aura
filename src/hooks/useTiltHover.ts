@@ -122,6 +122,7 @@ export function useTiltHover(config: TiltConfig = {}) {
       }
 
       function onMove(ev: MouseEvent) {
+        if (!card) return;
         const rect = card.getBoundingClientRect();
         const hw = rect.width / 2;
         const hh = rect.height / 2;
