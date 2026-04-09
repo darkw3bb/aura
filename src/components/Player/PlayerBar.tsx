@@ -1,9 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { CoverArt } from '../Library/CoverArt';
 import { StarRating } from '../Rating/StarRating';
 import type { Song } from '../../lib/tauri';
+
+interface SyncStatus {
+  syncing: boolean;
+  progress: number;
+  message: string;
+}
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -20,11 +27,19 @@ export function PlayerBar() {
 
   const { loadArtist, loadAlbum } = useLibraryStore();
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
 
   useEffect(() => {
     intervalRef.current = setInterval(refreshState, 1000);
     return () => clearInterval(intervalRef.current);
   }, [refreshState]);
+
+  useEffect(() => {
+    const unlisten = listen<SyncStatus>('sync-status', (event) => {
+      setSyncStatus(event.payload.syncing ? event.payload : null);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, []);
 
   const progress = durationSecs ? (elapsedSecs / durationSecs) * 100 : 0;
 
@@ -181,6 +196,7 @@ export function PlayerBar() {
             className="flex-1 h-1 rounded-full appearance-none cursor-pointer volume-slider"
           />
         </div>
+        {syncStatus && <SyncIndicator status={syncStatus} />}
         {currentTrack && <FormatPill track={currentTrack} isPlaying={isPlaying} />}
       </div>
     </div>
@@ -220,6 +236,22 @@ function FormatPill({ track, isPlaying }: { track: Song; isPlaying: boolean }) {
           {bitRate}k
         </span>
       )}
+    </div>
+  );
+}
+
+function SyncIndicator({ status }: { status: SyncStatus }) {
+  const pct = Math.round(status.progress * 100);
+  return (
+    <div className="flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] tabular-nums"
+      style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+      title={status.message}
+    >
+      <svg className="animate-spin shrink-0" width="12" height="12" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" opacity="0.25" />
+        <path d="M14.5 8a6.5 6.5 0 0 0-6.5-6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+      <span>Syncing {pct}%</span>
     </div>
   );
 }

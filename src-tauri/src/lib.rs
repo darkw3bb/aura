@@ -3,6 +3,7 @@ mod cache;
 mod commands;
 mod media_controls;
 mod subsonic;
+mod sync;
 
 use audio::streaming::StreamingBuffer;
 use cache::CacheDb;
@@ -10,6 +11,7 @@ use futures_util::StreamExt;
 use media_controls::MediaControlManager;
 use parking_lot::Mutex;
 use souvlaki::MediaControlEvent;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use subsonic::client::SubsonicClient;
 use subsonic::models::Song;
@@ -65,6 +67,7 @@ pub struct AppState {
     pub app_dir: Mutex<Option<std::path::PathBuf>>,
     pub player: Mutex<audio::Player>,
     pub media_controls: Mutex<MediaControlManager>,
+    pub sync_running: AtomicBool,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -77,6 +80,7 @@ pub fn run() {
         app_dir: Mutex::new(None),
         player: Mutex::new(audio::Player::new()),
         media_controls: Mutex::new(MediaControlManager::new()),
+        sync_running: AtomicBool::new(false),
     });
 
     let state_for_setup = state.clone();

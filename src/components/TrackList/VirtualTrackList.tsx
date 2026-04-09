@@ -6,6 +6,8 @@ import { useLibraryStore } from '../../stores/libraryStore';
 import { useContextMenuStore } from '../../stores/contextMenuStore';
 import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { StarRating } from '../Rating/StarRating';
+import { CoverArt } from '../Library/CoverArt';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 const PAGE_SIZE = 50;
 
@@ -99,6 +101,7 @@ interface TrackRowProps {
   showBitRate?: boolean;
   showPlayCount?: boolean;
   showAdded?: boolean;
+  showArt?: boolean;
   focused: boolean;
   onPlay: (index: number) => void;
   onRatingChange: (trackId: string, rating: number) => void;
@@ -118,6 +121,7 @@ const TrackRow = memo(function TrackRow({
   showBitRate,
   showPlayCount,
   showAdded,
+  showArt,
   focused,
   onPlay,
   onRatingChange,
@@ -152,6 +156,7 @@ const TrackRow = memo(function TrackRow({
           index + 1
         )}
       </span>
+      {showArt && <CoverArt coverArt={track.cover_art} artist={track.artist} albumName={track.album} size={80} className="w-8 h-8 rounded shrink-0" />}
       <span className={`flex-1 min-w-0 text-[13px] truncate ${isCurrentTrack ? 'text-themed-accent' : 'text-themed-primary'}`}>
         {track.title}
       </span>
@@ -212,6 +217,7 @@ const TrackRow = memo(function TrackRow({
   prev.showBitRate === next.showBitRate &&
   prev.showPlayCount === next.showPlayCount &&
   prev.showAdded === next.showAdded &&
+  prev.showArt === next.showArt &&
   prev.focused === next.focused
 );
 
@@ -268,6 +274,7 @@ export function VirtualTrackList({
 
   const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
   const { loadArtist, loadAlbum } = useLibraryStore();
+  const showTrackListArt = useSettingsStore((s) => s.showTrackListArt);
   const showContextMenu = useContextMenuStore((s) => s.show);
 
   // Stable loadMore — all mutable values accessed via refs
@@ -329,7 +336,7 @@ export function VirtualTrackList({
   const rowVirtualizer = useVirtualizer({
     count: tracks.length + (hasMore ? 1 : 0),
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 48,
+    estimateSize: () => 52,
     overscan: 20,
     onChange: (instance) => {
       const items = instance.getVirtualItems();
@@ -402,6 +409,7 @@ export function VirtualTrackList({
 
       <div className="flex items-center gap-3 px-6 py-2 text-[11px] font-semibold uppercase tracking-wide text-themed-muted border-b border-themed bg-themed-primary sticky top-0 z-10">
         <span className="w-10 text-right tabular-nums">#</span>
+        {showTrackListArt && <span className="w-8" />}
         <SortHeader field="title" label="Title" className="flex-1 min-w-0" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
         <SortHeader field="artist" label="Artist" className="w-36 min-w-0" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
         <span className="w-36 min-w-0">Album</span>
@@ -455,6 +463,7 @@ export function VirtualTrackList({
                 showBitRate={showBitRate}
                 showPlayCount={showPlayCount}
                 showAdded={showAdded}
+                showArt={showTrackListArt}
                 focused={focusIndex === virtualRow.index}
                 onPlay={handlePlay}
                 onRatingChange={handleRatingChange}
