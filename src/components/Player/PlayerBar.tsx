@@ -3,6 +3,7 @@ import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { CoverArt } from '../Library/CoverArt';
 import { StarRating } from '../Rating/StarRating';
+import { OutputSelector } from './OutputSelector';
 import type { Song } from '../../lib/tauri';
 
 function formatTime(secs: number): string {
@@ -163,8 +164,9 @@ export function PlayerBar() {
         </div>
       </div>
 
-      {/* Volume + Format */}
+      {/* Volume + Output + Format */}
       <div className="flex items-center gap-3 shrink-0">
+        <OutputSelector />
         <div className="flex items-center gap-2 w-32">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 stroke-themed-muted" strokeWidth="2">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />

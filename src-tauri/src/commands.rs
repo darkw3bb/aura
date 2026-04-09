@@ -1,6 +1,8 @@
 use base64::Engine;
 use crate::audio::streaming::StreamingBuffer;
 use crate::cache::{CacheDb, read_cached_cover_art, write_cached_cover_art};
+use crate::music_assistant::client::MusicAssistantClient;
+use crate::music_assistant::models::*;
 use crate::subsonic::client::SubsonicClient;
 use crate::subsonic::models::*;
 use crate::AppState;
@@ -355,6 +357,14 @@ pub async fn scrobble(
 
 // -- Playback commands --
 
+/// Extract the current MA output player_id, if any, without holding the lock.
+fn get_ma_output(state: &AppState) -> Option<String> {
+    match *state.output_mode.lock() {
+        OutputMode::MusicAssistant { ref player_id } => Some(player_id.clone()),
+        OutputMode::Local => None,
+    }
+}
+
 /// Start streaming a track: create a `StreamingBuffer`, spawn a background
 /// download task, then hand the buffer to the player so decoding begins
 /// as soon as the first bytes arrive.
@@ -408,6 +418,17 @@ pub async fn play_track(
     track: Song,
 ) -> Result<(), String> {
     let client = state.client.lock().clone().ok_or("Not connected")?;
+
+    if let Some(pid) = get_ma_output(&state) {
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        let stream_url = client.stream_url(&track.id);
+        log::info!("[MA] play_track -> player={}, track={}, url_len={}", pid, track.title, stream_url.len());
+        ma.play_media(&pid, &stream_url, "replace").await?;
+        log::info!("[MA] play_track -> play_media succeeded");
+        state.player.lock().set_current_track_only(track);
+        return Ok(());
+    }
+
     stream_and_play(&state, &client, &track).await
 }
 
@@ -429,11 +450,28 @@ pub async fn play_track_in_context(
         player.queue_mut().set_tracks_at(tracks, index);
     }
 
+    if let Some(pid) = get_ma_output(&state) {
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        let stream_url = client.stream_url(&track.id);
+        log::info!("[MA] play_track_in_context -> player={}, track={}, index={}", pid, track.title, index);
+        ma.play_media(&pid, &stream_url, "replace").await?;
+        log::info!("[MA] play_track_in_context -> play_media succeeded");
+        state.player.lock().set_current_track_only(track);
+        return Ok(());
+    }
+
     stream_and_play(&state, &client, &track).await
 }
 
 #[tauri::command]
 pub async fn pause(state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+    if let Some(pid) = get_ma_output(&state) {
+        log::info!("[MA] pause -> player={}", pid);
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        ma.pause(&pid).await?;
+        log::info!("[MA] pause -> succeeded");
+        return Ok(());
+    }
     state.player.lock().pause();
     state.media_controls.lock().set_paused();
     Ok(())
@@ -441,6 +479,13 @@ pub async fn pause(state: tauri::State<'_, Arc<AppState>>) -> Result<(), String>
 
 #[tauri::command]
 pub async fn resume(state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+    if let Some(pid) = get_ma_output(&state) {
+        log::info!("[MA] resume -> player={}", pid);
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        ma.resume(&pid).await?;
+        log::info!("[MA] resume -> succeeded");
+        return Ok(());
+    }
     state.player.lock().resume();
     state.media_controls.lock().set_playing();
     Ok(())
@@ -448,6 +493,11 @@ pub async fn resume(state: tauri::State<'_, Arc<AppState>>) -> Result<(), String
 
 #[tauri::command]
 pub async fn stop(state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+    if let Some(pid) = get_ma_output(&state) {
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        ma.stop(&pid).await?;
+        return Ok(());
+    }
     state.player.lock().stop();
     state.media_controls.lock().set_stopped();
     Ok(())
@@ -458,6 +508,11 @@ pub async fn seek(
     state: tauri::State<'_, Arc<AppState>>,
     position_secs: f64,
 ) -> Result<(), String> {
+    if let Some(pid) = get_ma_output(&state) {
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        ma.seek(&pid, position_secs).await?;
+        return Ok(());
+    }
     let mut player = state.player.lock();
     player.seek(std::time::Duration::from_secs_f64(position_secs))
 }
@@ -467,6 +522,12 @@ pub async fn set_volume(
     state: tauri::State<'_, Arc<AppState>>,
     volume: f32,
 ) -> Result<(), String> {
+    if let Some(pid) = get_ma_output(&state) {
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        let ma_volume = (volume * 100.0).round() as f64;
+        ma.set_volume(&pid, ma_volume).await?;
+        return Ok(());
+    }
     state.player.lock().set_volume(volume);
     Ok(())
 }
@@ -475,6 +536,45 @@ pub async fn set_volume(
 pub async fn get_playback_state(
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<PlaybackState, String> {
+    if let Some(pid) = get_ma_output(&state) {
+        let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+        let queue_state = ma.get_queue_state(&pid).await?;
+        let player_state = ma.get_player(&pid).await?;
+
+        let player = state.player.lock();
+        let repeat = match player.queue().repeat_mode() {
+            crate::audio::queue::RepeatMode::Off => "off",
+            crate::audio::queue::RepeatMode::All => "all",
+            crate::audio::queue::RepeatMode::One => "one",
+        };
+
+        let is_playing = queue_state.state == "playing";
+        let is_idle = queue_state.state == "idle";
+        let current_track = player.current_track().cloned();
+        let has_track = current_track.is_some();
+        let finished = is_idle && has_track;
+        let duration_secs = current_track
+            .as_ref()
+            .and_then(|t| t.duration)
+            .map(|d| d as f64);
+
+        log::info!(
+            "[MA] get_playback_state: queue_state={}, is_playing={}, is_idle={}, has_track={}, finished={}, elapsed={}",
+            queue_state.state, is_playing, is_idle, has_track, finished, queue_state.elapsed_time
+        );
+
+        return Ok(PlaybackState {
+            is_playing,
+            current_track,
+            elapsed_secs: queue_state.elapsed_time,
+            duration_secs,
+            volume: (player_state.volume_level / 100.0) as f32,
+            shuffle: player.queue().is_shuffle(),
+            repeat: repeat.to_string(),
+            finished,
+        });
+    }
+
     let player = state.player.lock();
     let repeat = match player.queue().repeat_mode() {
         crate::audio::queue::RepeatMode::Off => "off",
@@ -502,7 +602,15 @@ pub async fn play_next(state: tauri::State<'_, Arc<AppState>>) -> Result<Option<
 
     if let Some(ref track) = next_track {
         let client = state.client.lock().clone().ok_or("Not connected")?;
-        stream_and_play(&state, &client, track).await?;
+
+        if let Some(pid) = get_ma_output(&state) {
+            let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+            let stream_url = client.stream_url(&track.id);
+            ma.play_media(&pid, &stream_url, "replace").await?;
+            state.player.lock().set_current_track_only(track.clone());
+        } else {
+            stream_and_play(&state, &client, track).await?;
+        }
     }
 
     Ok(next_track)
@@ -519,7 +627,15 @@ pub async fn play_previous(
 
     if let Some(ref track) = prev_track {
         let client = state.client.lock().clone().ok_or("Not connected")?;
-        stream_and_play(&state, &client, track).await?;
+
+        if let Some(pid) = get_ma_output(&state) {
+            let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+            let stream_url = client.stream_url(&track.id);
+            ma.play_media(&pid, &stream_url, "replace").await?;
+            state.player.lock().set_current_track_only(track.clone());
+        } else {
+            stream_and_play(&state, &client, track).await?;
+        }
     }
 
     Ok(prev_track)
@@ -606,7 +722,15 @@ pub async fn jump_to_in_queue(
 
     if let Some(ref track) = track {
         let client = state.client.lock().clone().ok_or("Not connected")?;
-        stream_and_play(&state, &client, track).await?;
+
+        if let Some(pid) = get_ma_output(&state) {
+            let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+            let stream_url = client.stream_url(&track.id);
+            ma.play_media(&pid, &stream_url, "replace").await?;
+            state.player.lock().set_current_track_only(track.clone());
+        } else {
+            stream_and_play(&state, &client, track).await?;
+        }
     }
 
     Ok(track)
@@ -719,4 +843,79 @@ pub async fn get_cached_tracks_by_rating(
     let cache = state.cache.lock();
     let cache = cache.as_ref().ok_or("Cache not initialized")?;
     cache.get_tracks_by_rating(offset.unwrap_or(0), limit.unwrap_or(50))
+}
+
+// -- Music Assistant commands --
+
+#[tauri::command]
+pub async fn ma_connect(
+    state: tauri::State<'_, Arc<AppState>>,
+    url: String,
+    token: String,
+) -> Result<(), String> {
+    let client = MusicAssistantClient::new(&url, &token);
+    client.ping().await?;
+    *state.ma_client.lock() = Some(client);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn ma_disconnect(state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+    if let Some(pid) = get_ma_output(&state) {
+        let ma = state.ma_client.lock().clone();
+        if let Some(ma) = ma {
+            let _ = ma.stop(&pid).await;
+        }
+    }
+    *state.output_mode.lock() = OutputMode::Local;
+    *state.ma_client.lock() = None;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn ma_get_players(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Vec<MaPlayerInfo>, String> {
+    let ma = state.ma_client.lock().clone().ok_or("Music Assistant not connected")?;
+    let players = ma.get_players().await?;
+    Ok(players.into_iter().map(MaPlayerInfo::from).collect())
+}
+
+#[tauri::command]
+pub async fn ma_set_output(
+    state: tauri::State<'_, Arc<AppState>>,
+    player_id: Option<String>,
+) -> Result<(), String> {
+    match player_id {
+        Some(pid) => {
+            state.player.lock().stop();
+            *state.output_mode.lock() = OutputMode::MusicAssistant {
+                player_id: pid,
+            };
+        }
+        None => {
+            let old_pid = get_ma_output(&state);
+            if let Some(pid) = old_pid {
+                let ma = state.ma_client.lock().clone();
+                if let Some(ma) = ma {
+                    let _ = ma.stop(&pid).await;
+                }
+            }
+            *state.output_mode.lock() = OutputMode::Local;
+            // Clear stale MA track metadata so local get_playback_state
+            // doesn't report finished=true and trigger auto-advance.
+            state.player.lock().stop();
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn ma_get_output(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Option<String>, String> {
+    match *state.output_mode.lock() {
+        OutputMode::MusicAssistant { ref player_id } => Ok(Some(player_id.clone())),
+        OutputMode::Local => Ok(None),
+    }
 }

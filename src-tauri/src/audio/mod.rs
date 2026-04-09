@@ -200,6 +200,13 @@ impl Player {
         self.track_duration
     }
 
+    /// Set the current track metadata without starting local playback.
+    /// Used when playback is routed through Music Assistant.
+    pub fn set_current_track_only(&mut self, track: Song) {
+        self.track_duration = track.duration.map(|d| Duration::from_secs(d as u64));
+        self.current_track = Some(track);
+    }
+
     pub fn update_track_rating(&mut self, track_id: &str, rating: i32) {
         if let Some(track) = &mut self.current_track {
             if track.id == track_id {

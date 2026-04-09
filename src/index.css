@@ -105,6 +105,10 @@
     background: var(--accent-hover);
   }
 
+  .output-menu-item:hover {
+    background: var(--bg-hover);
+  }
+
   .control-btn {
     color: var(--text-secondary);
     transition: color 120ms ease;

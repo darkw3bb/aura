@@ -121,6 +121,14 @@ export interface QueueInfo {
   currentIndex: number | null;
 }
 
+export interface MaPlayer {
+  id: string;
+  name: string;
+  powered: boolean;
+  available: boolean;
+  playerType: string;
+}
+
 export const api = {
   connect: (url: string, username: string, password: string) =>
     invoke<void>('connect', { url, username, password }),
@@ -179,4 +187,12 @@ export const api = {
     invoke<FlatSong[]>('get_all_tracks', { offset, limit, sortField, sortDir }),
   getCachedTracksByRating: (offset?: number, limit?: number) =>
     invoke<FlatSong[]>('get_cached_tracks_by_rating', { offset, limit }),
+
+  maConnect: (url: string, token: string) =>
+    invoke<void>('ma_connect', { url, token }),
+  maDisconnect: () => invoke<void>('ma_disconnect'),
+  maGetPlayers: () => invoke<MaPlayer[]>('ma_get_players'),
+  maSetOutput: (playerId: string | null) =>
+    invoke<void>('ma_set_output', { playerId }),
+  maGetOutput: () => invoke<string | null>('ma_get_output'),
 };

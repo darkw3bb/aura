@@ -2,12 +2,15 @@ mod audio;
 mod cache;
 mod commands;
 mod media_controls;
+mod music_assistant;
 mod subsonic;
 
 use audio::streaming::StreamingBuffer;
 use cache::CacheDb;
 use futures_util::StreamExt;
 use media_controls::MediaControlManager;
+use music_assistant::client::MusicAssistantClient;
+use music_assistant::models::OutputMode;
 use parking_lot::Mutex;
 use souvlaki::MediaControlEvent;
 use std::sync::Arc;
@@ -65,6 +68,8 @@ pub struct AppState {
     pub app_dir: Mutex<Option<std::path::PathBuf>>,
     pub player: Mutex<audio::Player>,
     pub media_controls: Mutex<MediaControlManager>,
+    pub ma_client: Mutex<Option<MusicAssistantClient>>,
+    pub output_mode: Mutex<OutputMode>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -77,6 +82,8 @@ pub fn run() {
         app_dir: Mutex::new(None),
         player: Mutex::new(audio::Player::new()),
         media_controls: Mutex::new(MediaControlManager::new()),
+        ma_client: Mutex::new(None),
+        output_mode: Mutex::new(OutputMode::default()),
     });
 
     let state_for_setup = state.clone();
@@ -92,6 +99,61 @@ pub fn run() {
             state.media_controls.lock().attach_handler({
                 let state = state.clone();
                 move |event| {
+                    let is_ma = matches!(*state.output_mode.lock(), OutputMode::MusicAssistant { .. });
+
+                    if is_ma {
+                        let state = state.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let player_id = match &*state.output_mode.lock() {
+                                OutputMode::MusicAssistant { player_id } => player_id.clone(),
+                                _ => return,
+                            };
+                            let ma = match state.ma_client.lock().clone() {
+                                Some(c) => c,
+                                None => return,
+                            };
+
+                            match event {
+                                MediaControlEvent::Toggle | MediaControlEvent::Play | MediaControlEvent::Pause => {
+                                    let _ = ma.pause(&player_id).await;
+                                }
+                                MediaControlEvent::Next => {
+                                    let (next_track, stream_url) = {
+                                        let mut player = state.player.lock();
+                                        let track = player.queue_mut().next().cloned();
+                                        let url = track.as_ref().and_then(|t| {
+                                            state.client.lock().as_ref().map(|c| c.stream_url(&t.id))
+                                        });
+                                        (track, url)
+                                    };
+                                    if let (Some(track), Some(url)) = (next_track, stream_url) {
+                                        let _ = ma.play_media(&player_id, &url, "replace").await;
+                                        state.player.lock().set_current_track_only(track);
+                                    }
+                                }
+                                MediaControlEvent::Previous => {
+                                    let (prev_track, stream_url) = {
+                                        let mut player = state.player.lock();
+                                        let track = player.queue_mut().previous().cloned();
+                                        let url = track.as_ref().and_then(|t| {
+                                            state.client.lock().as_ref().map(|c| c.stream_url(&t.id))
+                                        });
+                                        (track, url)
+                                    };
+                                    if let (Some(track), Some(url)) = (prev_track, stream_url) {
+                                        let _ = ma.play_media(&player_id, &url, "replace").await;
+                                        state.player.lock().set_current_track_only(track);
+                                    }
+                                }
+                                MediaControlEvent::Stop => {
+                                    let _ = ma.stop(&player_id).await;
+                                }
+                                _ => {}
+                            }
+                        });
+                        return;
+                    }
+
                     match event {
                         MediaControlEvent::Toggle => {
                             let is_playing = state.player.lock().is_playing();
@@ -191,6 +253,11 @@ pub fn run() {
             commands::sync_library,
             commands::search_local,
             commands::search_all,
+            commands::ma_connect,
+            commands::ma_disconnect,
+            commands::ma_get_players,
+            commands::ma_set_output,
+            commands::ma_get_output,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

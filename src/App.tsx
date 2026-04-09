@@ -28,6 +28,12 @@ function App() {
     if (savedUrl && savedUser && savedPass && !connected) {
       connect(savedUrl, savedUser, savedPass);
     }
+
+    const maUrl = localStorage.getItem('ae_ma_url');
+    const maToken = localStorage.getItem('ae_ma_token');
+    if (maUrl && maToken) {
+      usePlayerStore.getState().maConnect(maUrl, maToken).catch(() => {});
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {

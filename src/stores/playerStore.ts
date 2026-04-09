@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import { api } from '../lib/tauri';
-import type { Song, PlaybackState } from '../lib/tauri';
+import type { Song, PlaybackState, MaPlayer } from '../lib/tauri';
 import { useLibraryStore } from './libraryStore';
+
+let _volumeDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const MA_GRACE_MS = 5000;
 
 interface QueueSource {
   artistId?: string;
@@ -27,6 +31,10 @@ interface PlayerStore {
   /** Prevents re-entrant auto-advance while one is already in flight. */
   _advancing: boolean;
 
+  maConnected: boolean;
+  maPlayers: MaPlayer[];
+  maOutputId: string | null;
+
   playTrack: (track: Song) => Promise<void>;
   playTrackInContext: (tracks: Song[], index: number) => Promise<void>;
   pause: () => Promise<void>;
@@ -47,6 +55,10 @@ interface PlayerStore {
   refreshQueue: () => Promise<void>;
   refreshState: () => Promise<void>;
   setRating: (trackId: string, rating: number) => Promise<void>;
+  maConnect: (url: string, token: string) => Promise<void>;
+  maDisconnect: () => Promise<void>;
+  maRefreshPlayers: () => Promise<void>;
+  maSetOutput: (playerId: string | null) => Promise<void>;
 }
 
 export const usePlayerStore = create<PlayerStore>((set, get) => ({
@@ -64,6 +76,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   _skipRefreshUntil: 0,
   _playGuard: 0,
   _advancing: false,
+  maConnected: false,
+  maPlayers: [],
+  maOutputId: null,
 
   playTrack: async (track: Song) => {
     const guard = Date.now();
@@ -77,7 +92,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     });
     try {
       await api.playTrack(track);
-      if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
+      if (get()._playGuard === guard) {
+        set({ _skipRefreshUntil: get().maOutputId ? Date.now() + MA_GRACE_MS : 0 });
+      }
       api.scrobble(track.id).catch(() => {});
     } catch (e) {
       if (get()._playGuard === guard) {
@@ -109,7 +126,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     });
     try {
       await api.playTrackInContext(tracks, index);
-      if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
+      if (get()._playGuard === guard) {
+        set({ _skipRefreshUntil: get().maOutputId ? Date.now() + MA_GRACE_MS : 0 });
+      }
       api.scrobble(track.id).catch(() => {});
       get().refreshQueue();
     } catch (e) {
@@ -121,18 +140,29 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   },
 
   pause: async () => {
-    set({ isPlaying: false, _skipRefreshUntil: Date.now() + 2000 });
-    await api.pause();
+    const grace = get().maOutputId ? MA_GRACE_MS : 2000;
+    set({ isPlaying: false, _skipRefreshUntil: Date.now() + grace });
+    try {
+      await api.pause();
+    } catch (e) {
+      console.error('[MA] pause error:', e);
+    }
   },
 
   resume: async () => {
-    set({ isPlaying: true, _skipRefreshUntil: Date.now() + 2000 });
-    await api.resume();
+    const grace = get().maOutputId ? MA_GRACE_MS : 2000;
+    set({ isPlaying: true, _skipRefreshUntil: Date.now() + grace });
+    try {
+      await api.resume();
+    } catch (e) {
+      console.error('[MA] resume error:', e);
+    }
   },
 
   stop: async () => {
     await api.stop();
-    set({ isPlaying: false, currentTrack: null, elapsedSecs: 0, _skipRefreshUntil: Date.now() + 2000 });
+    const grace = get().maOutputId ? MA_GRACE_MS : 2000;
+    set({ isPlaying: false, currentTrack: null, elapsedSecs: 0, _skipRefreshUntil: Date.now() + grace });
   },
 
   playNext: async () => {
@@ -148,7 +178,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
           elapsedSecs: 0,
           durationSecs: track.duration ?? null,
           history: prev ? [...s.history, prev] : s.history,
-          _skipRefreshUntil: 0,
+          _skipRefreshUntil: get().maOutputId ? Date.now() + MA_GRACE_MS : 0,
         }));
         api.scrobble(track.id).catch(() => {});
         get().refreshQueue();
@@ -183,7 +213,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                   _playGuard: guard,
                 });
                 await api.playTrackInContext(songs, 0);
-                if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
+                if (get()._playGuard === guard) {
+                  set({ _skipRefreshUntil: get().maOutputId ? Date.now() + MA_GRACE_MS : 0 });
+                }
                 api.scrobble(songs[0].id).catch(() => {});
                 get().refreshQueue();
               }
@@ -211,7 +243,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
           elapsedSecs: 0,
           durationSecs: track.duration ?? null,
           history: history.length > 0 ? history.slice(0, -1) : history,
-          _skipRefreshUntil: 0,
+          _skipRefreshUntil: get().maOutputId ? Date.now() + MA_GRACE_MS : 0,
         });
         api.scrobble(track.id).catch(() => {});
         get().refreshQueue();
@@ -239,8 +271,15 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   },
 
   setVolume: async (v: number) => {
-    await api.setVolume(v);
     set({ volume: v });
+    if (get().maOutputId) {
+      if (_volumeDebounce) clearTimeout(_volumeDebounce);
+      _volumeDebounce = setTimeout(() => {
+        api.setVolume(v).catch(() => {});
+      }, 120);
+    } else {
+      await api.setVolume(v);
+    }
   },
 
   addToQueue: async (track: Song) => {
@@ -299,7 +338,17 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       const s = get();
       const skipping = Date.now() < s._skipRefreshUntil;
 
+      if (s.maOutputId) {
+        console.log('[MA] refreshState:', {
+          maState: { isPlaying: state.isPlaying, finished: state.finished, elapsed: state.elapsedSecs },
+          local: { isPlaying: s.isPlaying, advancing: s._advancing },
+          skipping,
+          skipUntil: s._skipRefreshUntil ? new Date(s._skipRefreshUntil).toISOString() : 'none',
+        });
+      }
+
       if (state.finished && s.isPlaying && !s._advancing && !skipping) {
+        if (s.maOutputId) console.log('[MA] refreshState: FINISHED -> calling playNext');
         set({ isPlaying: false });
         get().playNext();
         return;
@@ -346,5 +395,30 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       history: s.history.map((t) => (t.id === trackId ? { ...t, user_rating: rating } : t)),
     }));
     useLibraryStore.getState().updateTrackRating(trackId, rating);
+  },
+
+  maConnect: async (url: string, token: string) => {
+    await api.maConnect(url, token);
+    set({ maConnected: true });
+    await get().maRefreshPlayers();
+  },
+
+  maDisconnect: async () => {
+    await api.maDisconnect();
+    set({ maConnected: false, maPlayers: [], maOutputId: null });
+  },
+
+  maRefreshPlayers: async () => {
+    try {
+      const players = await api.maGetPlayers();
+      set({ maPlayers: players });
+    } catch {
+      set({ maPlayers: [] });
+    }
+  },
+
+  maSetOutput: async (playerId: string | null) => {
+    await api.maSetOutput(playerId);
+    set({ maOutputId: playerId });
   },
 }));
