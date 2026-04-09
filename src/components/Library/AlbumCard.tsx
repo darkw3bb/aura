@@ -1,3 +1,4 @@
+import { memo, useCallback, type MouseEvent } from 'react';
 import { usePlayerStore } from '../../stores/playerStore';
 import { api } from '../../lib/tauri';
 import type { Album } from '../../lib/tauri';
@@ -12,14 +13,19 @@ export async function playAlbum(albumId: string) {
   }
 }
 
-export function AlbumCard({ album, onClick, onArtistClick, showYear = true, itemProps }: {
+export const AlbumCard = memo(function AlbumCard({ album, onClick, onArtistClick, showYear = true, itemProps }: {
   album: Album;
   onClick: () => void;
   onArtistClick?: () => void;
   showYear?: boolean;
   itemProps?: Record<string, unknown>;
 }) {
-  const { cardRef, shineRef, textRef } = useTiltHover();
+  const { cardRef, shineRef, textRef, onMouseEnter: tiltEnter } = useTiltHover();
+
+  const handleMouseEnter = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    tiltEnter(e);
+    if (itemProps?.onMouseEnter) (itemProps.onMouseEnter as (e: MouseEvent<HTMLDivElement>) => void)(e);
+  }, [tiltEnter, itemProps?.onMouseEnter]);
 
   return (
     <div
@@ -27,6 +33,7 @@ export function AlbumCard({ album, onClick, onArtistClick, showYear = true, item
       onClick={onClick}
       className="group relative text-left rounded-lg p-2.5 cursor-pointer bg-themed-secondary data-[focused=true]:ring-1 data-[focused=true]:ring-[var(--accent)]"
       {...itemProps}
+      onMouseEnter={handleMouseEnter}
     >
       <div ref={shineRef} className="tilt-shine rounded-lg" />
       <div className="relative mb-2 overflow-hidden rounded-md">
@@ -63,4 +70,4 @@ export function AlbumCard({ album, onClick, onArtistClick, showYear = true, item
       </div>
     </div>
   );
-}
+});

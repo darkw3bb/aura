@@ -98,7 +98,7 @@ export function YearsView() {
             <div className="sticky top-0 z-10 px-6 py-3 bg-themed-primary backdrop-blur-sm">
               <h3 className="text-[15px] font-semibold text-themed-primary">{year}</h3>
             </div>
-            <div className="px-6 pb-4">
+            <div className="px-6 pb-4 year-section-content">
               <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(156px, 1fr))' }}>
                 {albums.map((album) => (
                   <AlbumCard
@@ -119,7 +119,7 @@ export function YearsView() {
           <div className="sticky top-0 z-10 px-6 py-3 bg-themed-primary backdrop-blur-sm">
             <h3 className="text-[15px] font-semibold text-themed-primary">Unknown Year</h3>
           </div>
-          <div className="px-6 pb-4">
+          <div className="px-6 pb-4 year-section-content">
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(156px, 1fr))' }}>
               {unknownAlbums.map((album) => (
                 <AlbumCard

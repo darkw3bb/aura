@@ -1,4 +1,4 @@
-import { useRef, useEffect, type RefObject } from 'react';
+import { useRef, useEffect, useCallback, type RefObject, type MouseEvent as ReactMouseEvent } from 'react';
 
 interface TiltConfig {
   maxTilt?: number;
@@ -53,98 +53,112 @@ export function useTiltHover(config: TiltConfig = {}) {
   const active = useRef(false);
   const running = useRef(false);
   const raf = useRef(0);
+  const initialized = useRef(false);
+  const listeners = useRef<{ move: (e: MouseEvent) => void; leave: () => void } | null>(null);
 
   useEffect(() => {
+    return () => {
+      if (initialized.current && cardRef.current && listeners.current) {
+        cardRef.current.removeEventListener('mousemove', listeners.current.move);
+        cardRef.current.removeEventListener('mouseleave', listeners.current.leave);
+      }
+      cancelAnimationFrame(raf.current);
+    };
+  }, []);
+
+  const onMouseEnter = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
     const card = cardRef.current;
     if (!card) return;
 
-    function applyStyles() {
-      const c = current.current;
-      if (cardRef.current) {
-        cardRef.current.style.transform =
-          `perspective(${perspective}px) rotateX(${c.rx}deg) rotateY(${c.ry}deg) scale3d(${c.scale},${c.scale},${c.scale})`;
+    if (!initialized.current) {
+      initialized.current = true;
+
+      function applyStyles() {
+        const c = current.current;
+        if (cardRef.current) {
+          cardRef.current.style.transform =
+            `perspective(${perspective}px) rotateX(${c.rx}deg) rotateY(${c.ry}deg) scale3d(${c.scale},${c.scale},${c.scale})`;
+        }
+        if (shineRef.current) {
+          shineRef.current.style.background =
+            `radial-gradient(ellipse at ${c.shineX}% ${c.shineY}%, rgba(255,255,255,${c.shineOpacity}) 0%, transparent 70%)`;
+        }
+        if (textRef.current) {
+          textRef.current.style.transform = `translate3d(${c.px}px,${c.py}px,0)`;
+        }
       }
-      if (shineRef.current) {
-        shineRef.current.style.background =
-          `radial-gradient(ellipse at ${c.shineX}% ${c.shineY}%, rgba(255,255,255,${c.shineOpacity}) 0%, transparent 70%)`;
-      }
-      if (textRef.current) {
-        textRef.current.style.transform = `translate3d(${c.px}px,${c.py}px,0)`;
-      }
-    }
 
-    function tick() {
-      const t = active.current ? lerpSpeed : returnSpeed;
-      const tgt = active.current ? target.current : ZERO;
-      const c = current.current;
+      function tick() {
+        const t = active.current ? lerpSpeed : returnSpeed;
+        const tgt = active.current ? target.current : ZERO;
+        const c = current.current;
 
-      c.rx = lerp(c.rx, tgt.rx, t);
-      c.ry = lerp(c.ry, tgt.ry, t);
-      c.scale = lerp(c.scale, tgt.scale, t);
-      c.shineX = lerp(c.shineX, tgt.shineX, t);
-      c.shineY = lerp(c.shineY, tgt.shineY, t);
-      c.shineOpacity = lerp(c.shineOpacity, tgt.shineOpacity, t);
-      c.px = lerp(c.px, tgt.px, t);
-      c.py = lerp(c.py, tgt.py, t);
+        c.rx = lerp(c.rx, tgt.rx, t);
+        c.ry = lerp(c.ry, tgt.ry, t);
+        c.scale = lerp(c.scale, tgt.scale, t);
+        c.shineX = lerp(c.shineX, tgt.shineX, t);
+        c.shineY = lerp(c.shineY, tgt.shineY, t);
+        c.shineOpacity = lerp(c.shineOpacity, tgt.shineOpacity, t);
+        c.px = lerp(c.px, tgt.px, t);
+        c.py = lerp(c.py, tgt.py, t);
 
-      applyStyles();
-
-      if (!active.current && vecNearZero(c, ZERO)) {
-        Object.assign(c, ZERO);
         applyStyles();
-        running.current = false;
-        return;
-      }
 
-      raf.current = requestAnimationFrame(tick);
-    }
+        if (!active.current && vecNearZero(c, ZERO)) {
+          Object.assign(c, ZERO);
+          applyStyles();
+          running.current = false;
+          return;
+        }
 
-    function startLoop() {
-      if (!running.current) {
-        running.current = true;
         raf.current = requestAnimationFrame(tick);
       }
+
+      function startLoop() {
+        if (!running.current) {
+          running.current = true;
+          raf.current = requestAnimationFrame(tick);
+        }
+      }
+
+      function onMove(ev: MouseEvent) {
+        const rect = card.getBoundingClientRect();
+        const hw = rect.width / 2;
+        const hh = rect.height / 2;
+        const ox = (ev.clientX - rect.left - hw) / hw;
+        const oy = (ev.clientY - rect.top - hh) / hh;
+
+        target.current = {
+          rx: oy * -maxTilt,
+          ry: ox * maxTilt,
+          scale,
+          shineX: ((ev.clientX - rect.left) / rect.width) * 100,
+          shineY: ((ev.clientY - rect.top) / rect.height) * 100,
+          shineOpacity: shineBrightness,
+          px: ox * -parallaxFactor,
+          py: oy * -parallaxFactor,
+        };
+        active.current = true;
+        startLoop();
+      }
+
+      function onLeave() {
+        active.current = false;
+        startLoop();
+      }
+
+      listeners.current = { move: onMove, leave: onLeave };
+      card.addEventListener('mousemove', onMove);
+      card.addEventListener('mouseleave', onLeave);
+
+      onMove(e.nativeEvent);
     }
-
-    function onMove(e: MouseEvent) {
-      const rect = card!.getBoundingClientRect();
-      const hw = rect.width / 2;
-      const hh = rect.height / 2;
-      const ox = (e.clientX - rect.left - hw) / hw;
-      const oy = (e.clientY - rect.top - hh) / hh;
-
-      target.current = {
-        rx: oy * -maxTilt,
-        ry: ox * maxTilt,
-        scale,
-        shineX: ((e.clientX - rect.left) / rect.width) * 100,
-        shineY: ((e.clientY - rect.top) / rect.height) * 100,
-        shineOpacity: shineBrightness,
-        px: ox * -parallaxFactor,
-        py: oy * -parallaxFactor,
-      };
-      active.current = true;
-      startLoop();
-    }
-
-    function onLeave() {
-      active.current = false;
-      startLoop();
-    }
-
-    card.addEventListener('mousemove', onMove);
-    card.addEventListener('mouseleave', onLeave);
-
-    return () => {
-      card.removeEventListener('mousemove', onMove);
-      card.removeEventListener('mouseleave', onLeave);
-      cancelAnimationFrame(raf.current);
-    };
   }, [maxTilt, perspective, scale, shineBrightness, parallaxFactor, lerpSpeed, returnSpeed]);
 
   return {
     cardRef: cardRef as RefObject<HTMLDivElement>,
     shineRef: shineRef as RefObject<HTMLDivElement>,
     textRef: textRef as RefObject<HTMLDivElement>,
+    onMouseEnter,
   };
 }

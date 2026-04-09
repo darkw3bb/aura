@@ -270,4 +270,9 @@
     pointer-events: none;
     z-index: 5;
   }
+
+  .year-section-content {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 500px;
+  }
 }

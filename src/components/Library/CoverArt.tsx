@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/tauri';
 
 const urlCache = new Map<string, string>();
@@ -13,31 +13,29 @@ interface CoverArtProps {
 }
 
 export function CoverArt({ coverArt, artist, albumName, size = 200, className = '' }: CoverArtProps) {
-  const [src, setSrc] = useState<string | null>(null);
+  const cacheKey = coverArt ? `${coverArt}_${size}` : '';
+  const [src, setSrc] = useState<string | null>(() => {
+    if (!coverArt) return null;
+    return urlCache.get(cacheKey) ?? null;
+  });
   const [fallbackAttempted, setFallbackAttempted] = useState(false);
+  const wasCached = useRef(src !== null);
 
   useEffect(() => {
-    if (!coverArt) return;
-    const key = `${coverArt}_${size}`;
-    if (failedKeys.has(key)) return;
-
-    const cached = urlCache.get(key);
-    if (cached) {
-      setSrc(cached);
-      return;
-    }
+    if (!coverArt || src) return;
+    if (failedKeys.has(cacheKey)) return;
 
     let cancelled = false;
     api.getCoverArtCached(coverArt, size).then((dataUri) => {
       if (!cancelled) {
-        urlCache.set(key, dataUri);
+        urlCache.set(cacheKey, dataUri);
         setSrc(dataUri);
       }
     }).catch(() => {
       if (!cancelled) {
         api.getCoverArtUrl(coverArt, size).then((url) => {
           if (!cancelled) {
-            urlCache.set(key, url);
+            urlCache.set(cacheKey, url);
             setSrc(url);
           }
         });
@@ -45,27 +43,25 @@ export function CoverArt({ coverArt, artist, albumName, size = 200, className = 
     });
 
     return () => { cancelled = true; };
-  }, [coverArt, size]);
+  }, [coverArt, size, cacheKey, src]);
 
   const handleError = useCallback(() => {
     if (fallbackAttempted || !coverArt) return;
     setFallbackAttempted(true);
 
-    const key = `${coverArt}_${size}`;
-
     if (artist && albumName) {
       api.fetchExternalCoverArt(artist, albumName, size).then((dataUri) => {
-        urlCache.set(key, dataUri);
+        urlCache.set(cacheKey, dataUri);
         setSrc(dataUri);
       }).catch(() => {
-        failedKeys.add(key);
+        failedKeys.add(cacheKey);
         setSrc(null);
       });
     } else {
-      failedKeys.add(key);
+      failedKeys.add(cacheKey);
       setSrc(null);
     }
-  }, [coverArt, artist, albumName, size, fallbackAttempted]);
+  }, [coverArt, artist, albumName, size, cacheKey, fallbackAttempted]);
 
   if (!src) {
     return (
@@ -85,7 +81,7 @@ export function CoverArt({ coverArt, artist, albumName, size = 200, className = 
     <img
       src={src}
       alt=""
-      className={`object-cover cover-fade-in ${className}`}
+      className={`object-cover ${wasCached.current ? '' : 'cover-fade-in'} ${className}`}
       loading="lazy"
       onError={handleError}
     />
