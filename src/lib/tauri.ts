@@ -143,6 +143,8 @@ export const api = {
     invoke<string>('fetch_cover_art', { id, size }),
   fetchExternalCoverArt: (artist: string, album: string, size?: number) =>
     invoke<string>('fetch_external_cover_art', { artist, album, size }),
+  getCoverArtCached: (id: string, size?: number) =>
+    invoke<string>('get_cover_art_cached', { id, size }),
 
   setRating: (id: string, rating: number) =>
     invoke<void>('set_rating', { id, rating }),
