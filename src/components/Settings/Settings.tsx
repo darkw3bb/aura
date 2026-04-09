@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { useThemeStore } from '../../stores/themeStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { themes } from '../../themes';
 
 export function Settings() {
   const { connect, error, connected, syncing, syncMessage, syncLibrary } =
     useLibraryStore();
   const { themeId, setTheme } = useThemeStore();
+  const { showTrackListArt, setShowTrackListArt } = useSettingsStore();
   const [url, setUrl] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -85,6 +87,21 @@ export function Settings() {
             </button>
           ))}
         </div>
+
+        <h2 className="text-2xl font-bold mb-4 text-themed-primary">Display</h2>
+        <label className="flex items-center justify-between gap-3 mb-8 cursor-pointer">
+          <span className="text-sm text-themed-secondary">Show album art in track lists</span>
+          <button
+            role="switch"
+            aria-checked={showTrackListArt}
+            onClick={() => setShowTrackListArt(!showTrackListArt)}
+            className={`relative w-10 h-6 rounded-full transition-colors cursor-pointer border-0 ${showTrackListArt ? 'bg-themed-accent' : 'bg-themed-tertiary'}`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${showTrackListArt ? 'translate-x-4' : 'translate-x-0'}`}
+            />
+          </button>
+        </label>
 
         <h2 className="text-2xl font-bold mb-6 text-themed-primary">
           {connected ? 'Server Settings' : 'Connect to Navidrome'}
