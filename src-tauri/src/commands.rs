@@ -40,6 +40,7 @@ pub struct QueueInfo {
 
 #[tauri::command]
 pub async fn connect(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     url: String,
     username: String,
@@ -57,9 +58,13 @@ pub async fn connect(
     std::fs::create_dir_all(&covers_dir)
         .map_err(|e| format!("Failed to create covers dir: {}", e))?;
 
+    crate::sync::stop_background_sync(&state);
+
     *state.client.lock() = Some(client);
     *state.cache.lock() = Some(cache);
     *state.app_dir.lock() = Some(cache_dir);
+
+    crate::sync::start_background_sync(Arc::clone(&state), app);
 
     Ok(())
 }

@@ -79,6 +79,10 @@ impl CacheDb {
             CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_genre ON tracks(genre);
+            CREATE TABLE IF NOT EXISTS sync_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
             ",
             )
             .map_err(|e| format!("Schema error: {}", e))?;
@@ -730,6 +734,45 @@ impl CacheDb {
             )
             .map_err(|e| format!("Update rating error: {}", e))?;
         Ok(())
+    }
+
+    pub fn get_sync_meta(&self, key: &str) -> Result<Option<String>, String> {
+        self.conn
+            .query_row(
+                "SELECT value FROM sync_meta WHERE key = ?1",
+                params![key],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| format!("sync_meta read error: {}", e))
+    }
+
+    pub fn set_sync_meta(&self, key: &str, value: &str) -> Result<(), String> {
+        self.conn
+            .execute(
+                "INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?1, ?2)",
+                params![key, value],
+            )
+            .map_err(|e| format!("sync_meta write error: {}", e))?;
+        Ok(())
+    }
+
+    pub fn album_exists(&self, id: &str) -> Result<bool, String> {
+        let count: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM albums WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("album_exists error: {}", e))?;
+        Ok(count > 0)
+    }
+
+    pub fn track_count(&self) -> Result<i64, String> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM tracks", [], |row| row.get(0))
+            .map_err(|e| format!("track_count error: {}", e))
     }
 
     pub fn update_album_rating(&self, album_id: &str, rating: i32) -> Result<(), String> {
