@@ -76,7 +76,7 @@ export function CoverArt({ coverArt, artist, albumName, size = 200, className = 
     <img
       src={src}
       alt=""
-      className={`object-cover ${className}`}
+      className={`object-cover cover-fade-in ${className}`}
       loading="lazy"
       onError={handleError}
     />
