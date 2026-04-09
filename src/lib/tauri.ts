@@ -130,6 +130,7 @@ export const api = {
   getAlbum: (id: string) => invoke<AlbumDetail>('get_album', { id }),
   getAlbumList: (listType: string, size?: number, offset?: number) =>
     invoke<Album[]>('get_album_list', { listType, size, offset }),
+  getAllAlbums: () => invoke<Album[]>('get_all_albums'),
   search: (query: string) => invoke<SearchResult>('search', { query }),
   getGenres: () => invoke<Genre[]>('get_genres'),
   getSongsByGenre: (genre: string, size?: number, offset?: number) =>

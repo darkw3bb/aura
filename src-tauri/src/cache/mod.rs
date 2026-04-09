@@ -686,6 +686,42 @@ impl CacheDb {
         Ok(results)
     }
 
+    pub fn get_all_albums(&self) -> Result<Vec<Album>, String> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT id, name, artist, artist_id, cover_art,
+                        song_count, duration, year, genre, user_rating
+                 FROM albums
+                 ORDER BY year DESC NULLS LAST, name ASC",
+            )
+            .map_err(|e| format!("Prepare error: {}", e))?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(Album {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    artist: row.get(2)?,
+                    artist_id: row.get(3)?,
+                    cover_art: row.get(4)?,
+                    song_count: row.get(5)?,
+                    duration: row.get(6)?,
+                    year: row.get(7)?,
+                    genre: row.get(8)?,
+                    created: None,
+                    user_rating: row.get(9)?,
+                })
+            })
+            .map_err(|e| format!("Query error: {}", e))?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(|e| format!("Row error: {}", e))?);
+        }
+        Ok(results)
+    }
+
     pub fn update_track_rating(&self, track_id: &str, rating: i32) -> Result<(), String> {
         self.conn
             .execute(

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { api } from '../lib/tauri';
 import type { Artist, Album, AlbumDetail, ArtistDetail } from '../lib/tauri';
 
-type View = 'albums' | 'artists' | 'artist-detail' | 'album-detail' | 'tracks' | 'rated' | 'genres' | 'genre-detail' | 'queue' | 'settings';
+type View = 'albums' | 'artists' | 'artist-detail' | 'album-detail' | 'tracks' | 'rated' | 'genres' | 'genre-detail' | 'years' | 'queue' | 'settings';
 
 interface NavEntry {
   view: View;
@@ -10,6 +10,7 @@ interface NavEntry {
   selectedArtist: ArtistDetail | null;
   artistAlbums: AlbumDetail[];
   selectedGenre: string | null;
+  scrollTop: number;
 }
 
 interface LibraryStore {
@@ -38,6 +39,7 @@ interface LibraryStore {
   loadAlbum: (id: string) => Promise<void>;
   loadArtist: (id: string) => Promise<void>;
   loadGenre: (genre: string) => void;
+  saveScrollTop: (scrollTop: number) => void;
   goBack: () => void;
   goForward: () => void;
   syncLibrary: () => Promise<void>;
@@ -51,6 +53,7 @@ const initialNavEntry: NavEntry = {
   selectedArtist: null,
   artistAlbums: [],
   selectedGenre: null,
+  scrollTop: 0,
 };
 
 function pushNav(state: LibraryStore, entry: NavEntry) {
@@ -86,7 +89,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   canGoForward: false,
 
   setView: (view) => {
-    const entry: NavEntry = { view, selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null };
+    const entry: NavEntry = { view, selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
     set((s) => pushNav(s, entry));
   },
 
@@ -97,7 +100,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
       localStorage.setItem('ae_server_url', url);
       localStorage.setItem('ae_username', username);
       localStorage.setItem('ae_password', password);
-      const entry: NavEntry = { view: 'albums', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null };
+      const entry: NavEntry = { view: 'albums', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
       set({
         connected: true,
         serverUrl: url,
@@ -137,7 +140,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   loadAlbum: async (id: string) => {
     try {
       const album = await api.getAlbum(id);
-      const entry: NavEntry = { view: 'album-detail', selectedAlbum: album, selectedArtist: null, artistAlbums: [], selectedGenre: null };
+      const entry: NavEntry = { view: 'album-detail', selectedAlbum: album, selectedArtist: null, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
       set((s) => pushNav(s, entry));
     } catch (e) {
       console.error('Load album error:', e);
@@ -147,7 +150,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   loadArtist: async (id: string) => {
     try {
       const artist = await api.getArtist(id);
-      const entry: NavEntry = { view: 'artist-detail', selectedAlbum: null, selectedArtist: artist, artistAlbums: [], selectedGenre: null };
+      const entry: NavEntry = { view: 'artist-detail', selectedAlbum: null, selectedArtist: artist, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
       set((s) => pushNav(s, entry));
       const albumDetails = await Promise.all(
         (artist.album ?? []).map((a) => api.getAlbum(a.id))
@@ -163,8 +166,16 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   },
 
   loadGenre: (genre: string) => {
-    const entry: NavEntry = { view: 'genre-detail', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: genre };
+    const entry: NavEntry = { view: 'genre-detail', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: genre, scrollTop: 0 };
     set((s) => pushNav(s, entry));
+  },
+
+  saveScrollTop: (scrollTop: number) => {
+    set((s) => {
+      const stack = [...s.navStack];
+      stack[s.navIndex] = { ...stack[s.navIndex], scrollTop };
+      return { navStack: stack };
+    });
   },
 
   goBack: () => {

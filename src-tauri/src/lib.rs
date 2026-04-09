@@ -154,6 +154,7 @@ pub fn run() {
             commands::get_artist,
             commands::get_album,
             commands::get_album_list,
+            commands::get_all_albums,
             commands::search,
             commands::get_genres,
             commands::get_songs_by_genre,

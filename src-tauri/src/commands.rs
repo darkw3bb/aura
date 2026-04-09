@@ -144,6 +144,24 @@ pub async fn get_album_list(
 }
 
 #[tauri::command]
+pub async fn get_all_albums(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Vec<Album>, String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    let albums = cache.get_all_albums()?;
+    Ok(albums
+        .into_iter()
+        .map(|mut a| {
+            if a.cover_art.is_none() {
+                a.cover_art = Some(a.id.clone());
+            }
+            a
+        })
+        .collect())
+}
+
+#[tauri::command]
 pub async fn search(
     state: tauri::State<'_, Arc<AppState>>,
     query: String,

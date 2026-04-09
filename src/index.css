@@ -254,4 +254,12 @@
     0% { transform: scaleY(0.3); }
     100% { transform: scaleY(1); }
   }
+
+  .cover-fade-in {
+    animation: cover-appear 200ms ease both;
+  }
+  @keyframes cover-appear {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
