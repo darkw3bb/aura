@@ -283,3 +283,75 @@ pub struct FlatSong {
     pub play_count: Option<i64>,
     pub created: Option<String>,
 }
+
+// -- Stats --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackStat {
+    pub id: String,
+    pub title: String,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub cover_art: Option<String>,
+    pub album_id: Option<String>,
+    pub artist_id: Option<String>,
+    pub plays: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtistStat {
+    pub id: String,
+    pub name: String,
+    pub cover_art: Option<String>,
+    pub plays: i64,
+    pub track_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlbumStat {
+    pub id: String,
+    pub name: String,
+    pub artist: Option<String>,
+    pub cover_art: Option<String>,
+    pub artist_id: Option<String>,
+    pub plays: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenreStat {
+    pub genre: String,
+    pub plays: i64,
+    pub track_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DailyPlay {
+    pub date: String,
+    pub count: i64,
+    pub duration_secs: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatsData {
+    pub total_tracks: i64,
+    pub total_albums: i64,
+    pub total_artists: i64,
+    pub total_genres: i64,
+    pub total_play_count: i64,
+    pub total_play_duration_secs: i64,
+    pub period_plays: i64,
+    pub period_unique_tracks: i64,
+    pub period_unique_artists: i64,
+    pub period_unique_albums: i64,
+    pub period_duration_secs: i64,
+    pub prev_plays: i64,
+    pub prev_unique_tracks: i64,
+    pub prev_unique_artists: i64,
+    pub prev_unique_albums: i64,
+    pub prev_duration_secs: i64,
+    pub top_tracks: Vec<TrackStat>,
+    pub top_artists: Vec<ArtistStat>,
+    pub top_albums: Vec<AlbumStat>,
+    pub top_genres: Vec<GenreStat>,
+    pub daily_plays: Vec<DailyPlay>,
+}
