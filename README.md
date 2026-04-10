@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="src-tauri/icons/icon.png" width="128" height="128" alt="Aura icon" />
+  <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Aura icon" />
 </p>
 
 <h1 align="center">Aura</h1>
 
 <p align="center">
-  A blazingly fast desktop music player for <a href="https://navidrome.org/">Navidrome</a> and Subsonic-compatible servers.<br>
-  Lightweight. Native. Cross-platform.
+  A desktop music player built for the way music was meant to be heard&mdash;album by album, year by year.<br>
+  Connects to <a href="https://navidrome.org/">Navidrome</a> and Subsonic-compatible servers. Lightweight. Native. Cross-platform.
 </p>
 
 <p align="center">
@@ -27,6 +27,55 @@
 
 ---
 
+## Why Aura
+
+Most music players treat songs as interchangeable items in a playlist. Aura doesn't.
+
+Aura is built for people who love music — who want to put on an album and hear it the way the artist intended, front to back. The entire interface is designed around **albums and artists**, not individual tracks. There's no standalone track shuffle mode because that's not the point. The point is discovery and immersion.
+
+**Browse your library through time.** The Years view lets you scroll through your collection decade by decade, year by year — a timeline of your musical taste. The Albums landing page shows what you've been listening to recently, keeping you connected to the music you're into right now. Artist pages group everything by album, because that's how music is made.
+
+**Designed to feel instant.** Your entire library — every album, artist, track, and piece of cover art — is cached locally on your machine. Search results come back in microseconds via a full-text index. Scrolling through thousands of albums is smooth because the UI never waits on your server. Pages open near-instantly. The app feels like browsing local files, even though your music lives on a remote server.
+
+Your music. Your server. A proper desktop app with a point of view about how music should be experienced.
+
+---
+
+## Features
+
+### Listening experience
+
+- **Album-first navigation** — Albums, Artists, and Years are the primary ways to explore your library
+- **Years view** — browse your entire collection grouped by release year, newest first
+- **Recently Played** — the Albums landing page keeps you close to what you've been listening to
+- **Artist pages** — album-grouped tracks with per-album ratings and Play All
+- **3D tilt hover** — Apple TV-style pointer-tracking tilt, shine, and parallax on album cards
+- **Star ratings** — rate tracks and albums 1–5 stars, synced back to your server
+- **Genre browsing** — explore your library by genre
+- **Queue management** — drag-and-drop reordering, play next, add to queue, previously-played history
+
+### Speed and efficiency
+
+- **Aggressive local caching** — metadata in SQLite, cover art on disk, search via FTS5 full-text index — the UI almost never makes a network call
+- **Background library sync** — incremental sync every hour, full sync every 6 hours, with a progress indicator in the player bar — your cache stays fresh without you lifting a finger
+- **Native Rust audio engine** — pure Rust playback via rodio + symphonia: FLAC, MP3, AAC, ALAC, OGG Vorbis, Opus, WAV, AIFF, WavPack
+- **Persistent cover art cache** — album art is downloaded once and served from disk forever, with iTunes fallback for missing artwork
+- **~5 MB binary** — minimal memory footprint, no Electron, no browser overhead
+
+### Desktop-native
+
+- **OS media controls** — macOS Now Playing / Control Center, Windows SMTC, Linux MPRIS
+- **Keyboard-driven** — Cmd/Ctrl+K search, vim-style J/K navigation, Enter to activate, and more
+- **Auto-updates** — built-in updater checks for new versions and installs with one click
+- **Cross-platform** — macOS, Windows, and Linux from a single codebase
+
+### Personalization
+
+- **7 built-in themes** — Midnight, Nord, Catppuccin, Aura Light, Winamp, Matrix, iTunes Classic
+- **Track list album art** — optional cover art thumbnails in track rows, togglable in Settings
+
+---
+
 ## Downloads
 
 Head to the **[Releases](https://github.com/darkw3bb/aura/releases)** page and grab the latest build for your platform:
@@ -42,45 +91,11 @@ Head to the **[Releases](https://github.com/darkw3bb/aura/releases)** page and g
 > ```bash
 > xattr -cr /Applications/Aura.app
 > ```
-> The app will open normally after that. This is a standard macOS restriction on unsigned apps -- the app is not actually damaged.
+> The app will open normally after that. This is a standard macOS restriction on unsigned apps — the app is not actually damaged.
 
-> **Where are the builds?** Every tagged release triggers a GitHub Actions build across macOS, Windows, and Linux. The compiled installers are uploaded as assets to the [Releases](https://github.com/darkw3bb/aura/releases) page -- not under "Packages" (that's for container images/npm modules). Look for the **Assets** dropdown at the bottom of each release.
+> **Where are the builds?** Every tagged release triggers a GitHub Actions build across macOS, Windows, and Linux. The compiled installers are uploaded as assets to the [Releases](https://github.com/darkw3bb/aura/releases) page — not under "Packages." Look for the **Assets** dropdown at the bottom of each release.
 
-> **Auto-updates:** Once installed, Aura checks for new versions automatically. You'll see a banner at the top of the app when an update is available -- one click to download, install, and restart.
-
----
-
-## What is this?
-
-Aura is a desktop music player that connects to your self-hosted [Navidrome](https://navidrome.org/) (or any Subsonic API-compatible) music server. Think of it as a native, fast, privacy-respecting alternative to streaming apps -- but for your own music library.
-
-Your music. Your server. A proper desktop app that doesn't eat 500MB of RAM.
-
-### Why not just use the Navidrome web UI?
-
-You absolutely can! But Aura gives you:
-- **Native audio playback** -- no browser overhead, pure Rust audio engine
-- **OS media key support** -- play/pause/skip from your keyboard, Control Center, or lock screen
-- **Instant search** -- local SQLite cache with full-text search, results in microseconds
-- **~5MB binary** -- vs ~150MB for Electron-based alternatives
-- **Auto-updates** -- always on the latest version without checking a website
-
----
-
-## Features
-
-- **Instant search** -- Local SQLite + FTS5 full-text index for sub-millisecond results (Cmd/Ctrl+K)
-- **Native audio engine** -- Pure Rust playback (rodio + symphonia) supporting FLAC, MP3, AAC, ALAC, OGG Vorbis, Opus, WAV, AIFF, WavPack
-- **OS media controls** -- macOS Now Playing / Control Center, Windows SMTC, Linux MPRIS
-- **Star ratings** -- Rate tracks 1-5 stars, synced back to your server
-- **Album browser** -- Grid view with cover art and artist sidebar
-- **Queue management** -- Drag-and-drop reordering, play next, add to queue
-- **Genre browsing** -- Explore your library by genre
-- **Keyboard-driven** -- Vim-style navigation (J/K), keyboard shortcuts for everything
-- **Background library sync** -- Full metadata cached locally for offline browsing
-- **Auto-updates** -- Built-in updater checks GitHub Releases for new versions
-- **Cross-platform** -- macOS, Windows, Linux from a single codebase
-- **Lightweight** -- Tiny binary, minimal memory footprint
+> **Auto-updates:** Once installed, Aura checks for new versions automatically. You'll see a banner at the top of the app when an update is available — one click to download, install, and restart.
 
 ---
 
@@ -167,23 +182,32 @@ npx tauri build
 ```
 src-tauri/           Rust backend
   src/
-    subsonic/        Subsonic/OpenSubsonic API client
     audio/           Audio playback engine (rodio + symphonia)
-    cache/           SQLite metadata cache + FTS5 search
-    media_controls   OS media key integration (souvlaki)
-    commands         Tauri IPC command handlers
+      streaming.rs   HTTP streaming with chunked buffer
+      queue.rs       Queue, shuffle, repeat logic
+    cache/           SQLite metadata cache + FTS5 search + cover art disk cache
+    subsonic/        Subsonic/OpenSubsonic API client
+      client.rs      REST client, auth, streaming URLs
+      models.rs      API response types
+    commands.rs      Tauri IPC command handlers
+    media_controls.rs  OS media key integration (souvlaki)
+    sync.rs          Background library sync (incremental + full)
+    lib.rs           App setup, plugin registration, event wiring
 
 src/                 React + TypeScript frontend
   components/
-    Player/          Transport bar (play/pause/skip/seek/volume)
-    Library/         Album grid, artist list, cover art
-    TrackList/       Infinite scroll virtual track list
+    Library/         Album grid, album detail, artist detail/list, cover art,
+                       genre list, Years view, album card with 3D tilt
+    Player/          Transport bar (play/pause/seek/volume/format pill/sync indicator)
+    TrackList/       Virtual track lists (all tracks, rated, genre, shared VirtualTrackList)
+    Queue/           Queue panel with drag-and-drop reordering
     Search/          Search overlay (Cmd+K)
-    Queue/           Queue panel with drag-and-drop
-    Settings/        Server connection settings
+    Settings/        Server connection, theme picker, display options
     Rating/          Star rating component
-  stores/            Zustand state management
-  hooks/             React hooks (search, updater)
+    UpdateBanner.tsx In-app update prompt
+  stores/            Zustand state (library, player, settings, theme, context menu)
+  hooks/             useSearch, useUpdater, useKeyboardNav, useTiltHover
+  themes/            7 color themes (midnight, nord, catppuccin, aura-light, etc.)
   lib/               Typed Tauri IPC wrappers
 ```
 
@@ -203,7 +227,11 @@ src/                 React + TypeScript frontend
 - [ ] Smart playlists
 - [ ] ReplayGain volume normalization
 - [ ] Crossfade
-- [ ] Theme system (dark/light/custom)
+- [x] Theme system (7 themes)
+- [x] Years view (browse by release year)
+- [x] Background library sync
+- [x] Cover art disk cache
+- [x] Album card 3D tilt hover
 
 ---
 
@@ -215,4 +243,4 @@ Contributions are very welcome! If you want to improve Aura, open a PR.
 
 ## License
 
-[MIT](LICENSE)
+[PolyForm Noncommercial 1.0.0](LICENSE)
