@@ -7,6 +7,7 @@ struct StreamingState {
     read_pos: u64,
     finished: bool,
     cancelled: bool,
+    content_length: Option<u64>,
 }
 
 struct StreamingShared {
@@ -31,13 +32,14 @@ pub struct StreamingWriter {
 }
 
 impl StreamingBuffer {
-    pub fn new() -> (Self, StreamingWriter) {
+    pub fn new(content_length: Option<u64>) -> (Self, StreamingWriter) {
         let shared = Arc::new(StreamingShared {
             state: Mutex::new(StreamingState {
                 buffer: Vec::new(),
                 read_pos: 0,
                 finished: false,
                 cancelled: false,
+                content_length,
             }),
             data_available: Condvar::new(),
         });
@@ -108,14 +110,17 @@ impl Seek for StreamingBuffer {
             SeekFrom::Start(n) => n,
             SeekFrom::Current(n) => (state.read_pos as i64 + n) as u64,
             SeekFrom::End(n) => {
-                if state.finished {
-                    (state.buffer.len() as i64 + n) as u64
+                let total = if state.finished {
+                    state.buffer.len() as u64
                 } else {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Unsupported,
-                        "SeekFrom::End unavailable while stream is still downloading",
-                    ));
-                }
+                    state.content_length.ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::Unsupported,
+                            "SeekFrom::End unavailable: stream still downloading and Content-Length unknown",
+                        )
+                    })?
+                };
+                (total as i64 + n) as u64
             }
         };
         state.read_pos = new_pos;

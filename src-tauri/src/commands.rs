@@ -436,7 +436,8 @@ async fn stream_and_play(
     track: &Song,
 ) -> Result<(), String> {
     let resp = client.start_stream(&track.id).await?;
-    let (buffer, writer) = StreamingBuffer::new();
+    let content_length = resp.content_length();
+    let (buffer, writer) = StreamingBuffer::new(content_length);
 
     let mut byte_stream = resp.bytes_stream();
     tokio::spawn(async move {
