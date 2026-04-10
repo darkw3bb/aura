@@ -121,6 +121,70 @@ export interface QueueInfo {
   currentIndex: number | null;
 }
 
+export interface TrackStat {
+  id: string;
+  title: string;
+  artist?: string;
+  album?: string;
+  cover_art?: string;
+  album_id?: string;
+  artist_id?: string;
+  plays: number;
+}
+
+export interface ArtistStat {
+  id: string;
+  name: string;
+  cover_art?: string;
+  plays: number;
+  track_count: number;
+}
+
+export interface AlbumStat {
+  id: string;
+  name: string;
+  artist?: string;
+  cover_art?: string;
+  artist_id?: string;
+  plays: number;
+}
+
+export interface GenreStat {
+  genre: string;
+  plays: number;
+  track_count: number;
+}
+
+export interface DailyPlay {
+  date: string;
+  count: number;
+  duration_secs: number;
+}
+
+export interface StatsData {
+  total_tracks: number;
+  total_albums: number;
+  total_artists: number;
+  total_genres: number;
+  total_play_count: number;
+  total_play_duration_secs: number;
+  period_plays: number;
+  period_unique_tracks: number;
+  period_unique_artists: number;
+  period_unique_albums: number;
+  period_duration_secs: number;
+  prev_plays: number;
+  prev_unique_tracks: number;
+  prev_unique_artists: number;
+  prev_unique_albums: number;
+  prev_duration_secs: number;
+  top_tracks: TrackStat[];
+  top_artists: ArtistStat[];
+  top_albums: AlbumStat[];
+  top_genres: GenreStat[];
+  daily_plays: DailyPlay[];
+}
+
 export const api = {
   connect: (url: string, username: string, password: string) =>
     invoke<void>('connect', { url, username, password }),
@@ -179,4 +243,7 @@ export const api = {
     invoke<FlatSong[]>('get_all_tracks', { offset, limit, sortField, sortDir }),
   getCachedTracksByRating: (offset?: number, limit?: number) =>
     invoke<FlatSong[]>('get_cached_tracks_by_rating', { offset, limit }),
+
+  recordPlay: (trackId: string) => invoke<void>('record_play', { trackId }),
+  getStats: (period: string) => invoke<StatsData>('get_stats', { period }),
 };

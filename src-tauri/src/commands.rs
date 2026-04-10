@@ -358,6 +358,65 @@ pub async fn scrobble(
     client.scrobble(&id).await
 }
 
+// -- Play history / stats --
+
+#[tauri::command]
+pub async fn record_play(
+    state: tauri::State<'_, Arc<AppState>>,
+    track_id: String,
+) -> Result<(), String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.record_play(&track_id)
+}
+
+#[tauri::command]
+pub async fn get_stats(
+    state: tauri::State<'_, Arc<AppState>>,
+    period: String,
+) -> Result<StatsData, String> {
+    use chrono::{Datelike, Local, NaiveDate};
+
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+
+    let now = Local::now().naive_local();
+    let today = now.date();
+
+    let (ps, pe, pvs, pve, all_time) = match period.as_str() {
+        "week" => {
+            let wd = today.weekday().num_days_from_monday() as i64;
+            let ws = today - chrono::Duration::days(wd);
+            let pws = ws - chrono::Duration::days(7);
+            (
+                ws.and_hms_opt(0, 0, 0).unwrap().format("%Y-%m-%d %H:%M:%S").to_string(),
+                now.format("%Y-%m-%d %H:%M:%S").to_string(),
+                pws.and_hms_opt(0, 0, 0).unwrap().format("%Y-%m-%d %H:%M:%S").to_string(),
+                ws.and_hms_opt(0, 0, 0).unwrap().format("%Y-%m-%d %H:%M:%S").to_string(),
+                false,
+            )
+        }
+        "month" => {
+            let ms = NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap();
+            let pms = if today.month() == 1 {
+                NaiveDate::from_ymd_opt(today.year() - 1, 12, 1).unwrap()
+            } else {
+                NaiveDate::from_ymd_opt(today.year(), today.month() - 1, 1).unwrap()
+            };
+            (
+                ms.and_hms_opt(0, 0, 0).unwrap().format("%Y-%m-%d %H:%M:%S").to_string(),
+                now.format("%Y-%m-%d %H:%M:%S").to_string(),
+                pms.and_hms_opt(0, 0, 0).unwrap().format("%Y-%m-%d %H:%M:%S").to_string(),
+                ms.and_hms_opt(0, 0, 0).unwrap().format("%Y-%m-%d %H:%M:%S").to_string(),
+                false,
+            )
+        }
+        _ => (String::new(), String::new(), String::new(), String::new(), true),
+    };
+
+    cache.get_stats(&ps, &pe, &pvs, &pve, all_time)
+}
+
 // -- Playback commands --
 
 /// Start streaming a track: create a `StreamingBuffer`, spawn a background

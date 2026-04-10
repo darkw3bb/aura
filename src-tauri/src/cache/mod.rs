@@ -1,7 +1,10 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::{Path, PathBuf};
 
-use crate::subsonic::models::{Album, AlbumDetail, Artist, ArtistDetail, FlatSong, Genre, Song};
+use crate::subsonic::models::{
+    Album, AlbumDetail, AlbumStat, Artist, ArtistDetail, ArtistStat, DailyPlay, FlatSong, Genre,
+    GenreStat, Song, StatsData, TrackStat,
+};
 
 pub struct CacheDb {
     conn: Connection,
@@ -76,6 +79,7 @@ impl CacheDb {
                 content_rowid='rowid'
             );
             CREATE INDEX IF NOT EXISTS idx_tracks_rating ON tracks(user_rating DESC);
+            CREATE INDEX IF NOT EXISTS idx_tracks_play_count ON tracks(play_count DESC);
             CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_genre ON tracks(genre);
@@ -83,6 +87,13 @@ impl CacheDb {
                 key TEXT PRIMARY KEY,
                 value TEXT
             );
+            CREATE TABLE IF NOT EXISTS play_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                track_id TEXT NOT NULL,
+                played_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
+            CREATE INDEX IF NOT EXISTS idx_play_history_track ON play_history(track_id);
             ",
             )
             .map_err(|e| format!("Schema error: {}", e))?;
@@ -783,6 +794,288 @@ impl CacheDb {
             )
             .map_err(|e| format!("Update album rating error: {}", e))?;
         Ok(())
+    }
+
+    pub fn record_play(&self, track_id: &str) -> Result<(), String> {
+        self.conn
+            .execute(
+                "INSERT INTO play_history (track_id) VALUES (?1)",
+                params![track_id],
+            )
+            .map_err(|e| format!("Record play error: {}", e))?;
+        Ok(())
+    }
+
+    fn period_aggregate(
+        &self,
+        start: &str,
+        end: &str,
+    ) -> Result<(i64, i64, i64, i64, i64), String> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*),
+                        COUNT(DISTINCT ph.track_id),
+                        COUNT(DISTINCT t.artist_id),
+                        COUNT(DISTINCT t.album_id),
+                        COALESCE(SUM(COALESCE(t.duration, 0)), 0)
+                 FROM play_history ph
+                 LEFT JOIN tracks t ON t.id = ph.track_id
+                 WHERE ph.played_at >= ?1 AND ph.played_at < ?2",
+                params![start, end],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            )
+            .map_err(|e| format!("Period aggregate error: {}", e))
+    }
+
+    pub fn get_stats(
+        &self,
+        period_start: &str,
+        period_end: &str,
+        prev_start: &str,
+        prev_end: &str,
+        all_time: bool,
+    ) -> Result<StatsData, String> {
+        let total_tracks: i64 = self.conn
+            .query_row("SELECT COUNT(*) FROM tracks", [], |r| r.get(0))
+            .unwrap_or(0);
+        let total_albums: i64 = self.conn
+            .query_row("SELECT COUNT(*) FROM albums", [], |r| r.get(0))
+            .unwrap_or(0);
+        let total_artists: i64 = self.conn
+            .query_row("SELECT COUNT(*) FROM artists", [], |r| r.get(0))
+            .unwrap_or(0);
+        let total_genres: i64 = self.conn
+            .query_row(
+                "SELECT COUNT(DISTINCT genre) FROM tracks WHERE genre IS NOT NULL AND genre != ''",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let total_play_count: i64 = self.conn
+            .query_row("SELECT COALESCE(SUM(play_count), 0) FROM tracks", [], |r| r.get(0))
+            .unwrap_or(0);
+        let total_play_duration_secs: i64 = self.conn
+            .query_row(
+                "SELECT COALESCE(SUM(COALESCE(duration,0) * COALESCE(play_count,0)), 0) FROM tracks",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        let (period_plays, period_unique_tracks, period_unique_artists, period_unique_albums, period_duration_secs) =
+            if all_time {
+                (total_play_count, total_tracks, total_artists, total_albums, total_play_duration_secs)
+            } else {
+                self.period_aggregate(period_start, period_end)?
+            };
+
+        let (prev_plays, prev_unique_tracks, prev_unique_artists, prev_unique_albums, prev_duration_secs) =
+            if all_time { (0, 0, 0, 0, 0) } else { self.period_aggregate(prev_start, prev_end)? };
+
+        let top_tracks = if all_time {
+            self.top_tracks_all_time()?
+        } else {
+            self.top_tracks_period(period_start, period_end)?
+        };
+        let top_artists = if all_time {
+            self.top_artists_all_time()?
+        } else {
+            self.top_artists_period(period_start, period_end)?
+        };
+        let top_albums = if all_time {
+            self.top_albums_all_time()?
+        } else {
+            self.top_albums_period(period_start, period_end)?
+        };
+        let top_genres = if all_time {
+            self.top_genres_all_time()?
+        } else {
+            self.top_genres_period(period_start, period_end)?
+        };
+        let daily_plays = if all_time {
+            Vec::new()
+        } else {
+            self.daily_plays(period_start, period_end)?
+        };
+
+        Ok(StatsData {
+            total_tracks,
+            total_albums,
+            total_artists,
+            total_genres,
+            total_play_count,
+            total_play_duration_secs,
+            period_plays,
+            period_unique_tracks,
+            period_unique_artists,
+            period_unique_albums,
+            period_duration_secs,
+            prev_plays,
+            prev_unique_tracks,
+            prev_unique_artists,
+            prev_unique_albums,
+            prev_duration_secs,
+            top_tracks,
+            top_artists,
+            top_albums,
+            top_genres,
+            daily_plays,
+        })
+    }
+
+    fn top_tracks_all_time(&self) -> Result<Vec<TrackStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, title, artist, album, cover_art, album_id, artist_id,
+                    COALESCE(play_count, 0) as plays
+             FROM tracks WHERE play_count > 0
+             ORDER BY play_count DESC LIMIT 10",
+        ).map_err(|e| format!("top_tracks_all_time: {}", e))?;
+        let rows = stmt.query_map([], |r| {
+            Ok(TrackStat {
+                id: r.get(0)?, title: r.get(1)?, artist: r.get(2)?,
+                album: r.get(3)?, cover_art: r.get(4)?, album_id: r.get(5)?,
+                artist_id: r.get(6)?, plays: r.get(7)?,
+            })
+        }).map_err(|e| format!("top_tracks_all_time query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_tracks_all_time row: {}", e))
+    }
+
+    fn top_tracks_period(&self, start: &str, end: &str) -> Result<Vec<TrackStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT t.id, t.title, t.artist, t.album, t.cover_art, t.album_id, t.artist_id,
+                    COUNT(*) as plays
+             FROM play_history ph
+             JOIN tracks t ON t.id = ph.track_id
+             WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+             GROUP BY t.id ORDER BY plays DESC LIMIT 10",
+        ).map_err(|e| format!("top_tracks_period: {}", e))?;
+        let rows = stmt.query_map(params![start, end], |r| {
+            Ok(TrackStat {
+                id: r.get(0)?, title: r.get(1)?, artist: r.get(2)?,
+                album: r.get(3)?, cover_art: r.get(4)?, album_id: r.get(5)?,
+                artist_id: r.get(6)?, plays: r.get(7)?,
+            })
+        }).map_err(|e| format!("top_tracks_period query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_tracks_period row: {}", e))
+    }
+
+    fn top_artists_all_time(&self) -> Result<Vec<ArtistStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT a.id, a.name, a.cover_art,
+                    SUM(COALESCE(t.play_count, 0)) as plays,
+                    COUNT(DISTINCT t.id) as track_count
+             FROM tracks t
+             JOIN artists a ON a.id = t.artist_id
+             WHERE t.play_count > 0
+             GROUP BY a.id ORDER BY plays DESC LIMIT 10",
+        ).map_err(|e| format!("top_artists_all_time: {}", e))?;
+        let rows = stmt.query_map([], |r| {
+            Ok(ArtistStat {
+                id: r.get(0)?, name: r.get(1)?, cover_art: r.get(2)?,
+                plays: r.get(3)?, track_count: r.get(4)?,
+            })
+        }).map_err(|e| format!("top_artists_all_time query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_artists_all_time row: {}", e))
+    }
+
+    fn top_artists_period(&self, start: &str, end: &str) -> Result<Vec<ArtistStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT a.id, a.name, a.cover_art, COUNT(*) as plays,
+                    COUNT(DISTINCT ph.track_id) as track_count
+             FROM play_history ph
+             JOIN tracks t ON t.id = ph.track_id
+             JOIN artists a ON a.id = t.artist_id
+             WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+             GROUP BY a.id ORDER BY plays DESC LIMIT 10",
+        ).map_err(|e| format!("top_artists_period: {}", e))?;
+        let rows = stmt.query_map(params![start, end], |r| {
+            Ok(ArtistStat {
+                id: r.get(0)?, name: r.get(1)?, cover_art: r.get(2)?,
+                plays: r.get(3)?, track_count: r.get(4)?,
+            })
+        }).map_err(|e| format!("top_artists_period query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_artists_period row: {}", e))
+    }
+
+    fn top_albums_all_time(&self) -> Result<Vec<AlbumStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT al.id, al.name, al.artist, al.cover_art, al.artist_id,
+                    SUM(COALESCE(t.play_count, 0)) as plays
+             FROM tracks t
+             JOIN albums al ON al.id = t.album_id
+             WHERE t.play_count > 0
+             GROUP BY al.id ORDER BY plays DESC LIMIT 10",
+        ).map_err(|e| format!("top_albums_all_time: {}", e))?;
+        let rows = stmt.query_map([], |r| {
+            Ok(AlbumStat {
+                id: r.get(0)?, name: r.get(1)?, artist: r.get(2)?,
+                cover_art: r.get(3)?, artist_id: r.get(4)?, plays: r.get(5)?,
+            })
+        }).map_err(|e| format!("top_albums_all_time query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_albums_all_time row: {}", e))
+    }
+
+    fn top_albums_period(&self, start: &str, end: &str) -> Result<Vec<AlbumStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT al.id, al.name, al.artist, al.cover_art, al.artist_id,
+                    COUNT(*) as plays
+             FROM play_history ph
+             JOIN tracks t ON t.id = ph.track_id
+             JOIN albums al ON al.id = t.album_id
+             WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+             GROUP BY al.id ORDER BY plays DESC LIMIT 10",
+        ).map_err(|e| format!("top_albums_period: {}", e))?;
+        let rows = stmt.query_map(params![start, end], |r| {
+            Ok(AlbumStat {
+                id: r.get(0)?, name: r.get(1)?, artist: r.get(2)?,
+                cover_art: r.get(3)?, artist_id: r.get(4)?, plays: r.get(5)?,
+            })
+        }).map_err(|e| format!("top_albums_period query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_albums_period row: {}", e))
+    }
+
+    fn top_genres_all_time(&self) -> Result<Vec<GenreStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT genre, SUM(COALESCE(play_count, 0)) as plays,
+                    COUNT(DISTINCT id) as track_count
+             FROM tracks
+             WHERE play_count > 0 AND genre IS NOT NULL AND genre != ''
+             GROUP BY genre ORDER BY plays DESC LIMIT 8",
+        ).map_err(|e| format!("top_genres_all_time: {}", e))?;
+        let rows = stmt.query_map([], |r| {
+            Ok(GenreStat { genre: r.get(0)?, plays: r.get(1)?, track_count: r.get(2)? })
+        }).map_err(|e| format!("top_genres_all_time query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_genres_all_time row: {}", e))
+    }
+
+    fn top_genres_period(&self, start: &str, end: &str) -> Result<Vec<GenreStat>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT t.genre, COUNT(*) as plays, COUNT(DISTINCT ph.track_id) as track_count
+             FROM play_history ph
+             JOIN tracks t ON t.id = ph.track_id
+             WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+               AND t.genre IS NOT NULL AND t.genre != ''
+             GROUP BY t.genre ORDER BY plays DESC LIMIT 8",
+        ).map_err(|e| format!("top_genres_period: {}", e))?;
+        let rows = stmt.query_map(params![start, end], |r| {
+            Ok(GenreStat { genre: r.get(0)?, plays: r.get(1)?, track_count: r.get(2)? })
+        }).map_err(|e| format!("top_genres_period query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("top_genres_period row: {}", e))
+    }
+
+    fn daily_plays(&self, start: &str, end: &str) -> Result<Vec<DailyPlay>, String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DATE(ph.played_at) as day, COUNT(*) as count,
+                    COALESCE(SUM(COALESCE(t.duration, 0)), 0) as duration_secs
+             FROM play_history ph
+             LEFT JOIN tracks t ON t.id = ph.track_id
+             WHERE ph.played_at >= ?1 AND ph.played_at < ?2
+             GROUP BY day ORDER BY day",
+        ).map_err(|e| format!("daily_plays: {}", e))?;
+        let rows = stmt.query_map(params![start, end], |r| {
+            Ok(DailyPlay { date: r.get(0)?, count: r.get(1)?, duration_secs: r.get(2)? })
+        }).map_err(|e| format!("daily_plays query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("daily_plays row: {}", e))
     }
 }
 

@@ -79,6 +79,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       await api.playTrack(track);
       if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
       api.scrobble(track.id).catch(() => {});
+      api.recordPlay(track.id).catch(() => {});
     } catch (e) {
       if (get()._playGuard === guard) {
         set({ isPlaying: false, currentTrack: null, _skipRefreshUntil: 0 });
@@ -111,6 +112,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
       await api.playTrackInContext(tracks, index);
       if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
       api.scrobble(track.id).catch(() => {});
+      api.recordPlay(track.id).catch(() => {});
       get().refreshQueue();
     } catch (e) {
       if (get()._playGuard === guard) {
@@ -151,6 +153,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
           _skipRefreshUntil: 0,
         }));
         api.scrobble(track.id).catch(() => {});
+        api.recordPlay(track.id).catch(() => {});
         get().refreshQueue();
       } else {
         // Queue exhausted -- try auto-advancing to next album
@@ -185,6 +188,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                 await api.playTrackInContext(songs, 0);
                 if (get()._playGuard === guard) set({ _skipRefreshUntil: 0 });
                 api.scrobble(songs[0].id).catch(() => {});
+                api.recordPlay(songs[0].id).catch(() => {});
                 get().refreshQueue();
               }
             }
@@ -214,6 +218,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
           _skipRefreshUntil: 0,
         });
         api.scrobble(track.id).catch(() => {});
+        api.recordPlay(track.id).catch(() => {});
         get().refreshQueue();
       } else {
         set({ _skipRefreshUntil: 0 });
@@ -275,6 +280,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         history: prev ? [...s.history, prev] : s.history,
       }));
       api.scrobble(track.id).catch(() => {});
+      api.recordPlay(track.id).catch(() => {});
       get().refreshQueue();
     }
   },
