@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLibraryStore } from './stores/libraryStore';
 import { usePlayerStore } from './stores/playerStore';
 import { Settings } from './components/Settings/Settings';
@@ -21,6 +21,9 @@ import { UpdateBanner } from './components/UpdateBanner';
 function App() {
   const { view, setView, connected, connect, canGoBack, canGoForward, goBack, goForward } = useLibraryStore();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [goMode, setGoMode] = useState(false);
+  const goModeRef = useRef(false);
+  const goTimeoutRef = useRef<number>(0);
 
   useEffect(() => {
     const savedUrl = localStorage.getItem('ae_server_url');
@@ -32,6 +35,38 @@ function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+
+    const goMap: Record<string, string> = {
+      a: 'albums', t: 'tracks', c: 'artists', d: 'genres',
+      r: 'rated', y: 'years', s: 'stats', q: 'queue', p: 'settings',
+    };
+
+    if (goModeRef.current && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      goModeRef.current = false;
+      setGoMode(false);
+      clearTimeout(goTimeoutRef.current);
+      if (!isTyping) {
+        const target = goMap[e.key.toLowerCase()];
+        if (target) {
+          useLibraryStore.getState().setView(target as Parameters<typeof setView>[0]);
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'g' && !e.metaKey && !e.ctrlKey && !isTyping && !goModeRef.current) {
+      goModeRef.current = true;
+      setGoMode(true);
+      goTimeoutRef.current = window.setTimeout(() => {
+        goModeRef.current = false;
+        setGoMode(false);
+      }, 2000);
+      return;
+    }
+
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       setSearchOpen((prev) => !prev);
@@ -47,11 +82,15 @@ function App() {
       if (canGoForward) goForward();
     }
     if (e.key === 'Escape') {
+      if (goModeRef.current) {
+        goModeRef.current = false;
+        setGoMode(false);
+        clearTimeout(goTimeoutRef.current);
+      }
       setSearchOpen(false);
     }
     if (e.code === 'Space') {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
+      if (isTyping) {
         return;
       }
       e.preventDefault();
@@ -64,7 +103,10 @@ function App() {
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(goTimeoutRef.current);
+    };
   }, [handleKeyDown]);
 
   return (
@@ -93,6 +135,8 @@ function App() {
                       <rect x="14" y="14" width="7" height="7" />
                     </svg>
                   }
+                  shortcutKey="a"
+                  goMode={goMode}
                 >
                   Albums
                 </NavButton>
@@ -107,6 +151,8 @@ function App() {
                       <circle cx="18" cy="16" r="3" />
                     </svg>
                   }
+                  shortcutKey="t"
+                  goMode={goMode}
                 >
                   Tracks
                 </NavButton>
@@ -120,6 +166,8 @@ function App() {
                       <circle cx="12" cy="7" r="4" />
                     </svg>
                   }
+                  shortcutKey="c"
+                  goMode={goMode}
                 >
                   Artists
                 </NavButton>
@@ -133,6 +181,8 @@ function App() {
                       <line x1="7" y1="7" x2="7.01" y2="7" />
                     </svg>
                   }
+                  shortcutKey="d"
+                  goMode={goMode}
                 >
                   Genres
                 </NavButton>
@@ -145,6 +195,8 @@ function App() {
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                     </svg>
                   }
+                  shortcutKey="r"
+                  goMode={goMode}
                 >
                   Rated
                 </NavButton>
@@ -160,6 +212,8 @@ function App() {
                       <line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
                   }
+                  shortcutKey="y"
+                  goMode={goMode}
                 >
                   Years
                 </NavButton>
@@ -174,6 +228,8 @@ function App() {
                       <line x1="6" y1="20" x2="6" y2="14" />
                     </svg>
                   }
+                  shortcutKey="s"
+                  goMode={goMode}
                 >
                   Stats
                 </NavButton>
@@ -210,6 +266,8 @@ function App() {
                       <line x1="3" y1="18" x2="3.01" y2="18" />
                     </svg>
                   }
+                  shortcutKey="q"
+                  goMode={goMode}
                 >
                   Queue
                 </NavButton>
@@ -223,6 +281,8 @@ function App() {
                       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                     </svg>
                   }
+                  shortcutKey="p"
+                  goMode={goMode}
                 >
                   Settings
                 </NavButton>
@@ -298,11 +358,15 @@ function NavButton({
   active,
   onClick,
   icon,
+  shortcutKey,
+  goMode,
 }: {
   children: React.ReactNode;
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
+  shortcutKey?: string;
+  goMode?: boolean;
 }) {
   return (
     <button
@@ -312,6 +376,11 @@ function NavButton({
     >
       {icon}
       {children}
+      {goMode && shortcutKey && (
+        <kbd className="ml-auto text-[10px] font-mono leading-none min-w-[18px] text-center px-1.5 py-0.5 rounded bg-themed-tertiary text-themed-muted border border-themed shadow-[0_1px_0_rgba(0,0,0,0.2)]">
+          {shortcutKey.toUpperCase()}
+        </kbd>
+      )}
     </button>
   );
 }
