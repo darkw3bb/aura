@@ -21,6 +21,15 @@ export function CoverArt({ coverArt, artist, albumName, size = 200, className = 
   const [fallbackAttempted, setFallbackAttempted] = useState(false);
   const wasCached = useRef(src !== null);
 
+  const [prevCacheKey, setPrevCacheKey] = useState(cacheKey);
+  if (prevCacheKey !== cacheKey) {
+    setPrevCacheKey(cacheKey);
+    const cached = coverArt ? (urlCache.get(cacheKey) ?? null) : null;
+    setSrc(cached);
+    setFallbackAttempted(false);
+    wasCached.current = cached !== null;
+  }
+
   useEffect(() => {
     if (!coverArt || src) return;
     if (failedKeys.has(cacheKey)) return;
