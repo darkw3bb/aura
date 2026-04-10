@@ -24,14 +24,19 @@ export function CoverArt({ coverArt, artist, albumName, size = 200, className = 
   const [prevCacheKey, setPrevCacheKey] = useState(cacheKey);
   if (prevCacheKey !== cacheKey) {
     setPrevCacheKey(cacheKey);
-    const cached = coverArt ? (urlCache.get(cacheKey) ?? null) : null;
-    setSrc(cached);
     setFallbackAttempted(false);
-    wasCached.current = cached !== null;
+    const cached = coverArt ? (urlCache.get(cacheKey) ?? null) : null;
+    if (cached) {
+      setSrc(cached);
+      wasCached.current = true;
+    } else if (!coverArt) {
+      setSrc(null);
+    }
   }
 
   useEffect(() => {
-    if (!coverArt || src) return;
+    if (!coverArt) return;
+    if (urlCache.has(cacheKey)) return;
     if (failedKeys.has(cacheKey)) return;
 
     let cancelled = false;
@@ -52,7 +57,7 @@ export function CoverArt({ coverArt, artist, albumName, size = 200, className = 
     });
 
     return () => { cancelled = true; };
-  }, [coverArt, size, cacheKey, src]);
+  }, [coverArt, size, cacheKey]);
 
   const handleError = useCallback(() => {
     if (fallbackAttempted || !coverArt) return;
