@@ -5,6 +5,14 @@ import { auraLight } from './aura-light';
 import { winamp } from './winamp';
 import { matrix } from './matrix';
 import { itunesClassic } from './itunes-classic';
+import { cyberdeck } from './cyberdeck';
+import { phosphor } from './phosphor';
+import { vaporwave } from './vaporwave';
+import { bloodmoon } from './bloodmoon';
+import { espresso } from './espresso';
+import { sahara } from './sahara';
+import { y2k } from './y2k';
+import { cybertruck } from './cybertruck';
 
 export interface Theme {
   id: string;
@@ -34,6 +42,14 @@ export const themes: Record<string, Theme> = {
   winamp,
   matrix,
   'itunes-classic': itunesClassic,
+  cyberdeck,
+  phosphor,
+  vaporwave,
+  bloodmoon,
+  espresso,
+  sahara,
+  y2k,
+  cybertruck,
 };
 
 export const defaultThemeId = 'midnight';
