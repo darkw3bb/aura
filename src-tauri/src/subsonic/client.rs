@@ -222,6 +222,49 @@ impl SubsonicClient {
         Ok(())
     }
 
+    pub async fn get_playlists(&self) -> Result<Vec<PlaylistSummary>, String> {
+        let body: PlaylistsBody = self.get("getPlaylists", &[]).await?;
+        Ok(body
+            .playlists
+            .map(|p| p.playlist)
+            .unwrap_or_default())
+    }
+
+    pub async fn get_playlist(&self, id: &str) -> Result<PlaylistDetail, String> {
+        let body: PlaylistBody = self.get("getPlaylist", &[("id", id)]).await?;
+        body.playlist
+            .ok_or_else(|| "Playlist not found".to_string())
+    }
+
+    pub async fn create_playlist(&self, name: &str) -> Result<PlaylistSummary, String> {
+        let body: CreatePlaylistBody = self.get("createPlaylist", &[("name", name)]).await?;
+        if let Some(pl) = body.playlist {
+            return Ok(pl);
+        }
+        let all = self.get_playlists().await?;
+        all
+            .into_iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| "createPlaylist did not return playlist id".to_string())
+    }
+
+    pub async fn update_playlist_add_song(
+        &self,
+        playlist_id: &str,
+        song_id: &str,
+    ) -> Result<(), String> {
+        let _: EmptyBody = self
+            .get(
+                "updatePlaylist",
+                &[
+                    ("playlistId", playlist_id),
+                    ("songIdToAdd", song_id),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     /// Begin streaming an audio track. Returns the HTTP `Response` as soon
     /// as headers arrive so the caller can consume the body incrementally.
     pub async fn start_stream(&self, id: &str) -> Result<reqwest::Response, String> {

@@ -2,7 +2,20 @@ import { create } from 'zustand';
 import { api } from '../lib/tauri';
 import type { Artist, Album, AlbumDetail, ArtistDetail } from '../lib/tauri';
 
-type View = 'albums' | 'artists' | 'artist-detail' | 'album-detail' | 'tracks' | 'rated' | 'genres' | 'genre-detail' | 'years' | 'stats' | 'queue' | 'settings';
+type View =
+  | 'albums'
+  | 'artists'
+  | 'artist-detail'
+  | 'album-detail'
+  | 'tracks'
+  | 'rated'
+  | 'genres'
+  | 'genre-detail'
+  | 'years'
+  | 'stats'
+  | 'queue'
+  | 'playlists'
+  | 'settings';
 
 interface NavEntry {
   view: View;
@@ -208,7 +221,14 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
     set({ syncing: true, syncMessage: 'Syncing library...' });
     try {
       const msg = await api.syncLibrary();
-      set({ syncing: false, syncMessage: msg });
+      let extra = '';
+      try {
+        const n = await api.syncPlaylistsToCache();
+        extra = ` ${n} playlist${n !== 1 ? 's' : ''} synced.`;
+      } catch {
+        /* playlist sync is best-effort */
+      }
+      set({ syncing: false, syncMessage: `${msg}.${extra}` });
     } catch (e) {
       set({ syncing: false, syncMessage: `Sync failed: ${e}` });
     }

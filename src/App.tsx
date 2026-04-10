@@ -8,6 +8,8 @@ import { AlbumDetail } from './components/Library/AlbumDetail';
 import { ArtistDetail } from './components/Library/ArtistDetail';
 import { PlayerBar } from './components/Player/PlayerBar';
 import { SearchOverlay } from './components/Search/SearchOverlay';
+import { PlaylistsView } from './components/Playlist/PlaylistsView';
+import { useCommandPaletteStore } from './stores/commandPaletteStore';
 import { RatedTracks } from './components/TrackList/RatedTracks';
 import { AllTracks } from './components/TrackList/AllTracks';
 import { GenreList } from './components/Library/GenreList';
@@ -20,7 +22,6 @@ import { UpdateBanner } from './components/UpdateBanner';
 
 function App() {
   const { view, setView, connected, connect, canGoBack, canGoForward, goBack, goForward } = useLibraryStore();
-  const [searchOpen, setSearchOpen] = useState(false);
   const [goMode, setGoMode] = useState(false);
   const goModeRef = useRef(false);
   const goTimeoutRef = useRef<number>(0);
@@ -40,7 +41,7 @@ function App() {
 
     const goMap: Record<string, string> = {
       a: 'albums', t: 'tracks', c: 'artists', d: 'genres',
-      r: 'rated', y: 'years', s: 'stats', q: 'queue', p: 'settings',
+      r: 'rated', y: 'years', s: 'stats', q: 'queue', l: 'playlists', p: 'settings',
     };
 
     if (goModeRef.current && !e.metaKey && !e.ctrlKey) {
@@ -69,7 +70,7 @@ function App() {
 
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
-      setSearchOpen((prev) => !prev);
+      useCommandPaletteStore.getState().togglePalette();
     }
     if ((e.metaKey || e.ctrlKey) && e.key === '[') {
       e.preventDefault();
@@ -87,7 +88,7 @@ function App() {
         setGoMode(false);
         clearTimeout(goTimeoutRef.current);
       }
-      setSearchOpen(false);
+      useCommandPaletteStore.getState().closePalette();
     }
     if (e.code === 'Space') {
       if (isTyping) {
@@ -188,6 +189,20 @@ function App() {
                 </NavButton>
 
                 <NavButton
+                  active={view === 'playlists'}
+                  onClick={() => setView('playlists')}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                    </svg>
+                  }
+                  shortcutKey="l"
+                  goMode={goMode}
+                >
+                  Playlists
+                </NavButton>
+
+                <NavButton
                   active={view === 'rated'}
                   onClick={() => setView('rated')}
                   icon={
@@ -239,7 +254,7 @@ function App() {
               <div className="flex flex-col gap-0.5">
                 <NavButton
                   active={false}
-                  onClick={() => setSearchOpen(true)}
+                  onClick={() => useCommandPaletteStore.getState().openPalette()}
                   icon={
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="11" cy="11" r="8" />
@@ -333,6 +348,7 @@ function App() {
             {view === 'genre-detail' && <GenreTracks />}
             {view === 'years' && <YearsView />}
             {view === 'stats' && <StatsView />}
+            {view === 'playlists' && <PlaylistsView />}
             {view === 'queue' && <QueuePanel />}
             {view === 'artists' && (
               <div className="p-6">
@@ -347,7 +363,7 @@ function App() {
 
       {connected && <PlayerBar />}
 
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchOverlay />
       <ContextMenu />
     </div>
   );

@@ -105,7 +105,8 @@ Head to the **[Releases](https://github.com/darkw3bb/aura/releases)** page and g
 |----------|--------|
 | `J` / `K` | Move focus down / up in lists and grids |
 | `Enter` | Activate focused item (open album, play track) |
-| `Cmd/Ctrl + K` | Open search |
+| `Cmd/Ctrl + K` | Open search and command palette (type `tag` for **Apply tag**; commands appear above results) |
+| `G` then `L` | Go to Playlists (tags synced from Navidrome as playlists) |
 | `Cmd/Ctrl + [` | Navigate back |
 | `Cmd/Ctrl + ]` | Navigate forward |
 | `Space` | Play / Pause |
@@ -201,7 +202,8 @@ src/                 React + TypeScript frontend
     Player/          Transport bar (play/pause/seek/volume/format pill/sync indicator)
     TrackList/       Virtual track lists (all tracks, rated, genre, shared VirtualTrackList)
     Queue/           Queue panel with drag-and-drop reordering
-    Search/          Search overlay (Cmd+K)
+    Search/          Search + command palette (Cmd+K; tags via Navidrome playlists)
+    Playlist/        Playlists page (tag sidebar + tracks)
     Settings/        Server connection, theme picker, display options
     Rating/          Star rating component
     UpdateBanner.tsx In-app update prompt

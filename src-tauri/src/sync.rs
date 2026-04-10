@@ -88,6 +88,12 @@ pub fn start_background_sync(state: Arc<AppState>, app: AppHandle) {
             }
 
             emit_done(&app);
+
+            match crate::commands::do_sync_playlists_to_cache(&*state).await {
+                Ok(n) => log::debug!("[playlists] synced {} playlists", n),
+                Err(e) => log::warn!("[playlists] sync failed: {}", e),
+            }
+
             sleep(INCREMENTAL_INTERVAL).await;
         }
 

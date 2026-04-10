@@ -1,8 +1,10 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useContextMenuStore } from '../../stores/contextMenuStore';
 import { useKeyboardNav } from '../../hooks/useKeyboardNav';
+import { useTrackTargetStore } from '../../stores/trackTargetStore';
+import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
@@ -19,6 +21,7 @@ export function AlbumDetail() {
   const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
   const showContextMenu = useContextMenuStore((s) => s.show);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [tagByTrackId, setTagByTrackId] = useState<Record<string, string[]>>({});
 
   const handleAlbumRating = async (rating: number) => {
     if (!selectedAlbum) return;
@@ -37,16 +40,75 @@ export function AlbumDetail() {
     [songs, playTrackInContext],
   );
 
-  const { getItemProps, handleMouseMove } = useKeyboardNav({
+  const { focusIndex, getItemProps, handleMouseMove } = useKeyboardNav({
     itemCount: songs.length,
     onActivate,
     scrollRef,
   });
 
+  useEffect(() => {
+    const song = focusIndex >= 0 ? songs[focusIndex] ?? null : null;
+    useTrackTargetStore.getState().setKeyboardTarget(song);
+    return () => {
+      useTrackTargetStore.getState().setKeyboardTarget(null);
+    };
+  }, [focusIndex, songs]);
+
+  useEffect(() => {
+    if (songs.length === 0) {
+      setTagByTrackId({});
+      return;
+    }
+    const ids = songs.map((s) => s.id);
+    const t = window.setTimeout(() => {
+      api
+        .getCachedTagsForTracks(ids)
+        .then((entries) => {
+          const next: Record<string, string[]> = {};
+          for (const e of entries) {
+            const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
+            next[id] = e.tags;
+          }
+          setTagByTrackId(next);
+        })
+        .catch(() => {});
+    }, 150);
+    return () => clearTimeout(t);
+  }, [songs]);
+
+  useEffect(() => {
+    const onTags = () => {
+      if (songs.length === 0) return;
+      const ids = songs.map((s) => s.id);
+      api
+        .getCachedTagsForTracks(ids)
+        .then((entries) => {
+          const next: Record<string, string[]> = {};
+          for (const e of entries) {
+            const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
+            next[id] = e.tags;
+          }
+          setTagByTrackId(next);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('aura-tags-changed', onTags);
+    return () => window.removeEventListener('aura-tags-changed', onTags);
+  }, [songs]);
+
+  const handleAlbumMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      handleMouseMove();
+      const el = (e.target as HTMLElement).closest('[data-track-row]');
+      if (!el) useTrackTargetStore.getState().setHoverTarget(null);
+    },
+    [handleMouseMove],
+  );
+
   if (!selectedAlbum) return null;
 
   return (
-    <div ref={scrollRef} className="p-6 overflow-y-auto h-full" onMouseMove={handleMouseMove}>
+    <div ref={scrollRef} className="p-6 overflow-y-auto h-full" onMouseMove={handleAlbumMouseMove}>
       <div className="flex gap-6 mb-6">
         <CoverArt
           coverArt={selectedAlbum.cover_art}
@@ -95,9 +157,13 @@ export function AlbumDetail() {
       </div>
 
       <div className="rounded-lg overflow-hidden bg-themed-secondary">
-        {songs.map((song, i) => (
+        {songs.map((song, i) => {
+          const itemProps = getItemProps(i);
+          const tags = tagByTrackId[song.id] ?? [];
+          return (
           <div
             key={song.id}
+            data-track-row
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => playTrackInContext(songs, i)}
             onContextMenu={(e) => {
@@ -105,9 +171,17 @@ export function AlbumDetail() {
               showContextMenu(e.clientX, e.clientY, [
                 { label: 'Play Next', onClick: () => insertNextInQueue(song) },
                 { label: 'Add to Queue', onClick: () => addToQueue(song) },
+                {
+                  label: 'Tag…',
+                  onClick: () => useCommandPaletteStore.getState().openPaletteTagStep(song),
+                },
               ]);
             }}
-            {...getItemProps(i)}
+            {...itemProps}
+            onMouseEnter={() => {
+              itemProps.onMouseEnter();
+              useTrackTargetStore.getState().setHoverTarget(song);
+            }}
           >
             <span className="w-8 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
               {currentTrack?.id === song.id ? (
@@ -122,6 +196,19 @@ export function AlbumDetail() {
               <p className={`text-[13px] truncate ${currentTrack?.id === song.id ? 'text-themed-accent' : 'text-themed-primary'}`}>
                 {song.title}
               </p>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-0.5 max-h-[18px] overflow-hidden">
+                  {tags.slice(0, 5).map((name) => (
+                    <span
+                      key={name}
+                      className="text-[9px] leading-tight px-1.5 py-0.5 rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[100px]"
+                      title={name}
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
               {song.artist && song.artist !== selectedAlbum.artist && (
                 <p className="text-[11px] truncate text-themed-muted">
                   {song.artist_id ? (
@@ -147,7 +234,8 @@ export function AlbumDetail() {
               {formatDuration(song.duration)}
             </span>
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );

@@ -225,6 +225,80 @@ pub struct SongsByGenreContainer {
     pub song: Option<Vec<Song>>,
 }
 
+// -- Playlists --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaylistSummary {
+    pub id: String,
+    pub name: String,
+    #[serde(alias = "songCount")]
+    pub song_count: Option<i32>,
+    pub duration: Option<i64>,
+    pub created: Option<String>,
+    pub owner: Option<String>,
+    #[serde(default)]
+    pub public: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaylistsBody {
+    pub playlists: Option<PlaylistsListContainer>,
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaylistsListContainer {
+    #[serde(default, deserialize_with = "deserialize_playlist_summaries")]
+    pub playlist: Vec<PlaylistSummary>,
+}
+
+fn deserialize_playlist_summaries<'de, D>(deserializer: D) -> Result<Vec<PlaylistSummary>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        Many(Vec<PlaylistSummary>),
+        One(PlaylistSummary),
+    }
+    let opt = Option::<OneOrMany>::deserialize(deserializer)?;
+    Ok(match opt {
+        None => vec![],
+        Some(OneOrMany::Many(v)) => v,
+        Some(OneOrMany::One(p)) => vec![p],
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaylistDetail {
+    pub id: String,
+    pub name: String,
+    #[serde(alias = "songCount")]
+    pub song_count: Option<i32>,
+    pub duration: Option<i64>,
+    pub created: Option<String>,
+    pub owner: Option<String>,
+    #[serde(default)]
+    pub public: Option<bool>,
+    pub entry: Option<Vec<Song>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaylistBody {
+    pub playlist: Option<PlaylistDetail>,
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatePlaylistBody {
+    pub playlist: Option<PlaylistSummary>,
+    #[serde(flatten)]
+    _extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
 // -- Ping --
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

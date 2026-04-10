@@ -2,8 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearch } from '../../hooks/useSearch';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../stores/libraryStore';
+import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
+import { useTrackTargetStore } from '../../stores/trackTargetStore';
 import { CoverArt } from '../Library/CoverArt';
-import type { FlatSong, Artist, Album, Genre } from '../../lib/tauri';
+import { api } from '../../lib/tauri';
+import type { FlatSong, Artist, Album, Genre, PlaylistSummary } from '../../lib/tauri';
+import { flatSongToSong } from '../../lib/flatSong';
 
 function formatDuration(secs?: number): string {
   if (!secs) return '--:--';
@@ -12,23 +16,13 @@ function formatDuration(secs?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function flatSongToSong(f: FlatSong) {
-  return {
-    id: f.id,
-    title: f.title,
-    album: f.album,
-    album_id: f.album_id,
-    artist: f.artist,
-    artist_id: f.artist_id,
-    track: f.track,
-    year: f.year,
-    genre: f.genre,
-    duration: f.duration,
-    bit_rate: f.bit_rate,
-    cover_art: f.cover_art,
-    user_rating: f.user_rating,
-    disc_number: f.disc_number,
-  };
+function matchesApplyTagCommand(query: string): boolean {
+  const n = query.trim().toLowerCase();
+  if (n.length < 1) return false;
+  if ('apply tag'.includes(n)) return true;
+  if (n.includes('tag')) return true;
+  if (n.includes('apply')) return true;
+  return false;
 }
 
 type SearchItem =
@@ -37,10 +31,11 @@ type SearchItem =
   | { type: 'genre'; data: Genre }
   | { type: 'song'; data: FlatSong };
 
-interface SearchOverlayProps {
-  open: boolean;
-  onClose: () => void;
-}
+type PaletteRow =
+  | { kind: 'command'; cmd: 'apply-tag'; disabled: boolean }
+  | { kind: 'search'; item: SearchItem };
+
+type TagRow = { type: 'playlist'; pl: PlaylistSummary } | { type: 'create'; name: string };
 
 function ArtistIcon() {
   return (
@@ -79,13 +74,49 @@ function TrackIcon() {
   );
 }
 
-export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
+export function SearchOverlay() {
+  const open = useCommandPaletteStore((s) => s.open);
+  const startInTagStep = useCommandPaletteStore((s) => s.startInTagStep);
+  const closePalette = useCommandPaletteStore((s) => s.closePalette);
+
+  const keyboardTarget = useTrackTargetStore((s) => s.keyboardTarget);
+  const hoverTarget = useTrackTargetStore((s) => s.hoverTarget);
+  const targetSong = keyboardTarget ?? hoverTarget;
+
+  const [step, setStep] = useState<'palette' | 'tag'>('palette');
+  const [tagQuery, setTagQuery] = useState('');
+  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
+  const [tagListIndex, setTagListIndex] = useState(0);
+  const [hint, setHint] = useState<string | null>(null);
+  const [tagBusy, setTagBusy] = useState(false);
+  const openedDirectToTag = useRef(false);
+
   const { query, results, loading, search, clear } = useSearch();
   const { playTrack } = usePlayerStore();
   const { loadArtist, loadAlbum, loadGenre } = useLibraryStore();
-  const [activeIndex, setActiveIndex] = useState(0);
-  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const keyboardNavRef = useRef(false);
+
+  const loadPlaylists = useCallback(() => {
+    return api.listCachedPlaylists().then(setPlaylists).catch(() => setPlaylists([]));
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setStep('palette');
+      setTagQuery('');
+      setTagListIndex(0);
+      setHint(null);
+      setTagBusy(false);
+      openedDirectToTag.current = false;
+      clear();
+      return;
+    }
+    if (startInTagStep) {
+      setStep('tag');
+      openedDirectToTag.current = true;
+      useCommandPaletteStore.setState({ startInTagStep: false });
+      void loadPlaylists();
+    }
+  }, [open, startInTagStep, loadPlaylists, clear]);
 
   const flatItems = useMemo<SearchItem[]>(() => {
     const items: SearchItem[] = [];
@@ -96,49 +127,181 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
     return items;
   }, [results]);
 
-  useEffect(() => { setActiveIndex(0); }, [results]);
+  const paletteRows = useMemo<PaletteRow[]>(() => {
+    const rows: PaletteRow[] = [];
+    if (matchesApplyTagCommand(query)) {
+      rows.push({ kind: 'command', cmd: 'apply-tag', disabled: !targetSong });
+    }
+    for (const item of flatItems) {
+      rows.push({ kind: 'search', item });
+    }
+    return rows;
+  }, [query, flatItems, targetSong]);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const keyboardNavRef = useRef(false);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query, results, step]);
 
   useEffect(() => {
     rowRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex]);
 
-  const executeItem = useCallback((item: SearchItem) => {
-    switch (item.type) {
-      case 'artist': loadArtist(item.data.id); break;
-      case 'album': loadAlbum(item.data.id); break;
-      case 'genre': loadGenre(item.data.value); break;
-      case 'song': playTrack(flatSongToSong(item.data)); break;
+  const tagRows = useMemo<TagRow[]>(() => {
+    const n = tagQuery.trim().toLowerCase();
+    const sorted = [...playlists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const filtered = n ? sorted.filter((p) => p.name.toLowerCase().includes(n)) : sorted;
+    const rows: TagRow[] = filtered.slice(0, 50).map((pl) => ({ type: 'playlist', pl }));
+    const trimmed = tagQuery.trim();
+    const exact =
+      trimmed.length > 0 &&
+      playlists.some((p) => p.name.toLowerCase() === trimmed.toLowerCase());
+    if (trimmed && !exact) {
+      rows.push({ type: 'create', name: trimmed });
     }
-    onClose();
-  }, [loadArtist, loadAlbum, loadGenre, playTrack, onClose]);
+    return rows;
+  }, [playlists, tagQuery]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'Escape':
-        onClose();
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        keyboardNavRef.current = true;
-        setActiveIndex((i) => Math.min(i + 1, flatItems.length - 1));
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        keyboardNavRef.current = true;
-        setActiveIndex((i) => Math.max(i - 1, 0));
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (flatItems[activeIndex]) executeItem(flatItems[activeIndex]);
-        break;
+  useEffect(() => {
+    setTagListIndex(0);
+  }, [tagQuery, playlists]);
+
+  useEffect(() => {
+    if (tagListIndex >= tagRows.length) {
+      setTagListIndex(Math.max(0, tagRows.length - 1));
     }
-  }, [onClose, flatItems, activeIndex, executeItem]);
+  }, [tagRows, tagListIndex]);
+
+  const executeSearchItem = useCallback(
+    (item: SearchItem) => {
+      switch (item.type) {
+        case 'artist':
+          loadArtist(item.data.id);
+          break;
+        case 'album':
+          loadAlbum(item.data.id);
+          break;
+        case 'genre':
+          loadGenre(item.data.value);
+          break;
+        case 'song':
+          playTrack(flatSongToSong(item.data));
+          break;
+      }
+      closePalette();
+    },
+    [loadArtist, loadAlbum, loadGenre, playTrack, closePalette],
+  );
+
+  const goToTagStep = useCallback(() => {
+    setHint(null);
+    setStep('tag');
+    setTagQuery('');
+    openedDirectToTag.current = false;
+    void loadPlaylists();
+  }, [loadPlaylists]);
+
+  const applyTag = useCallback(
+    async (name: string) => {
+      if (!targetSong || !name.trim()) return;
+      setTagBusy(true);
+      setHint(null);
+      try {
+        await api.applyPlaylistTag(targetSong, name.trim());
+        window.dispatchEvent(new CustomEvent('aura-tags-changed'));
+        closePalette();
+      } catch (e) {
+        setHint(String(e));
+      } finally {
+        setTagBusy(false);
+      }
+    },
+    [targetSong, closePalette],
+  );
+
+  const handlePaletteKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (step !== 'palette') return;
+      switch (e.key) {
+        case 'Escape':
+          e.preventDefault();
+          closePalette();
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          keyboardNavRef.current = true;
+          setActiveIndex((i) => Math.min(i + 1, Math.max(0, paletteRows.length - 1)));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          keyboardNavRef.current = true;
+          setActiveIndex((i) => Math.max(i - 1, 0));
+          break;
+        case 'Enter': {
+          e.preventDefault();
+          const row = paletteRows[activeIndex];
+          if (!row) return;
+          if (row.kind === 'command') {
+            if (row.disabled) {
+              setHint('Select a track first (use J/K or hover a row).');
+              return;
+            }
+            goToTagStep();
+            return;
+          }
+          executeSearchItem(row.item);
+          break;
+        }
+      }
+    },
+    [step, closePalette, paletteRows, activeIndex, goToTagStep, executeSearchItem],
+  );
+
+  const handleTagKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (step !== 'tag') return;
+      switch (e.key) {
+        case 'Escape':
+          e.preventDefault();
+          if (openedDirectToTag.current) {
+            closePalette();
+          } else {
+            setStep('palette');
+            setTagQuery('');
+          }
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setTagListIndex((i) => Math.min(i + 1, Math.max(0, tagRows.length - 1)));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setTagListIndex((i) => Math.max(i - 1, 0));
+          break;
+        case 'Enter': {
+          e.preventDefault();
+          const row = tagRows[tagListIndex];
+          if (!row || tagBusy) return;
+          if (row.type === 'playlist') {
+            void applyTag(row.pl.name);
+          } else {
+            void applyTag(row.name);
+          }
+          break;
+        }
+      }
+    },
+    [step, tagRows, tagListIndex, tagBusy, applyTag, closePalette],
+  );
 
   const handleMouseMove = useCallback(() => {
     keyboardNavRef.current = false;
   }, []);
 
-  const handleMouseEnter = useCallback((flatIdx: number) => {
+  const handleMouseEnterPalette = useCallback((flatIdx: number) => {
     if (!keyboardNavRef.current) setActiveIndex(flatIdx);
   }, []);
 
@@ -146,21 +309,89 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
 
   const { artists, albums, songs, genres } = results;
   const hasResults = artists.length > 0 || albums.length > 0 || genres.length > 0 || songs.length > 0;
+  const showCommand = matchesApplyTagCommand(query);
 
-  const artistStartIdx = 0;
-  const albumStartIdx = artists.length;
-  const genreStartIdx = artists.length + albums.length;
-  const songStartIdx = artists.length + albums.length + genres.length;
+  const artistStartIdx = showCommand ? 1 : 0;
+  const albumStartIdx = artistStartIdx + artists.length;
+  const genreStartIdx = albumStartIdx + albums.length;
+  const songStartIdx = genreStartIdx + genres.length;
 
   const setRowRef = (flatIdx: number) => (el: HTMLDivElement | null) => {
     rowRefs.current[flatIdx] = el;
   };
 
+  if (step === 'tag') {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-start justify-center pt-24"
+        style={{ background: 'rgba(0,0,0,0.7)' }}
+        onClick={() => closePalette()}
+      >
+        <div
+          className="w-full max-w-2xl rounded-xl overflow-hidden shadow-2xl bg-themed-secondary"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-4 py-3 border-b border-themed">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-themed-muted mb-1">Apply tag</p>
+            {targetSong && (
+              <p className="text-[13px] text-themed-primary truncate">
+                {targetSong.title}
+                <span className="text-themed-muted"> — {targetSong.artist ?? 'Unknown'}</span>
+              </p>
+            )}
+            {!targetSong && (
+              <p className="text-[13px] text-themed-muted">No track selected.</p>
+            )}
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-themed">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Tag or playlist name…"
+              value={tagQuery}
+              onChange={(e) => setTagQuery(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+              disabled={!targetSong || tagBusy}
+              className="flex-1 bg-transparent border-0 outline-none text-[13px] text-themed-primary"
+            />
+          </div>
+          {hint && <div className="px-4 py-2 text-[12px] text-red-400">{hint}</div>}
+          <div className="max-h-80 overflow-y-auto">
+            {tagRows.length === 0 && (
+              <div className="px-4 py-4 text-[13px] text-themed-muted">
+                {playlists.length === 0 ? 'No playlists yet — type a new tag name and press Enter.' : 'No matches — press Enter to create this tag.'}
+              </div>
+            )}
+            {tagRows.map((row, i) => (
+              <div
+                key={row.type === 'playlist' ? row.pl.id : `create-${row.name}`}
+                className={`track-row px-4 py-2 cursor-pointer text-[13px] ${i === tagListIndex ? 'track-row-active' : 'text-themed-primary'}`}
+                onClick={() => {
+                  if (!targetSong || tagBusy) return;
+                  if (row.type === 'playlist') void applyTag(row.pl.name);
+                  else void applyTag(row.name);
+                }}
+                onMouseEnter={() => setTagListIndex(i)}
+              >
+                {row.type === 'playlist' ? (
+                  <span>{row.pl.name}</span>
+                ) : (
+                  <span className="text-themed-accent">Create &ldquo;{row.name}&rdquo;</span>
+                )}
+              </div>
+            ))}
+          </div>
+          {tagBusy && <div className="px-4 py-2 text-[12px] text-themed-muted">Saving…</div>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-24"
       style={{ background: 'rgba(0,0,0,0.7)' }}
-      onClick={onClose}
+      onClick={() => closePalette()}
     >
       <div
         className="w-full max-w-2xl rounded-xl overflow-hidden shadow-2xl bg-themed-secondary"
@@ -174,15 +405,18 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
           <input
             autoFocus
             type="text"
-            placeholder="Search tracks, albums, artists..."
+            placeholder="Search or type a command (e.g. tag)…"
             value={query}
             onChange={(e) => search(e.target.value)}
             className="flex-1 bg-transparent border-0 outline-none text-[13px] text-themed-primary"
-            onKeyDown={handleKeyDown}
+            onKeyDown={handlePaletteKeyDown}
           />
           {query && (
             <button
-              onClick={() => { clear(); }}
+              type="button"
+              onClick={() => {
+                clear();
+              }}
               className="text-[11px] cursor-pointer bg-transparent border-0 text-themed-muted"
             >
               Clear
@@ -190,14 +424,39 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
           )}
         </div>
 
+        {hint && <div className="px-4 py-2 text-[12px] text-amber-400 border-b border-themed">{hint}</div>}
+
         {loading && (
           <div className="px-4 py-3 text-[13px] text-themed-muted">
             Searching...
           </div>
         )}
 
-        {hasResults && (
+        {(showCommand || hasResults) && (
           <div className="max-h-96 overflow-y-auto" onMouseMove={handleMouseMove}>
+            {showCommand && (
+              <div className="search-group">
+                <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-2 bg-themed-secondary border-b border-themed">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-themed-muted">Commands</span>
+                </div>
+                <div
+                  ref={setRowRef(0)}
+                  className={`track-row flex items-center gap-3 px-4 py-2 cursor-pointer ${activeIndex === 0 ? 'track-row-active' : ''} ${!targetSong ? 'opacity-50' : ''}`}
+                  onClick={() => {
+                    if (!targetSong) {
+                      setHint('Select a track first (use J/K or hover a row).');
+                      return;
+                    }
+                    goToTagStep();
+                  }}
+                  onMouseEnter={() => handleMouseEnterPalette(0)}
+                >
+                  <span className="text-[13px] text-themed-primary">Apply tag</span>
+                  <span className="search-type-pill ml-auto">Command</span>
+                </div>
+              </div>
+            )}
+
             {artists.length > 0 && (
               <div className="search-group">
                 <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-2 bg-themed-secondary border-b border-themed">
@@ -212,8 +471,11 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                       key={artist.id}
                       ref={setRowRef(flatIdx)}
                       className={`track-row flex items-center gap-3 px-4 py-2 cursor-pointer ${flatIdx === activeIndex ? 'track-row-active' : ''}`}
-                      onClick={() => { loadArtist(artist.id); onClose(); }}
-                      onMouseEnter={() => handleMouseEnter(flatIdx)}
+                      onClick={() => {
+                        loadArtist(artist.id);
+                        closePalette();
+                      }}
+                      onMouseEnter={() => handleMouseEnterPalette(flatIdx)}
                     >
                       <CoverArt coverArt={artist.cover_art} size={80} className="w-8 h-8 rounded-full shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -243,8 +505,11 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                       key={album.id}
                       ref={setRowRef(flatIdx)}
                       className={`track-row flex items-center gap-3 px-4 py-2 cursor-pointer ${flatIdx === activeIndex ? 'track-row-active' : ''}`}
-                      onClick={() => { loadAlbum(album.id); onClose(); }}
-                      onMouseEnter={() => handleMouseEnter(flatIdx)}
+                      onClick={() => {
+                        loadAlbum(album.id);
+                        closePalette();
+                      }}
+                      onMouseEnter={() => handleMouseEnterPalette(flatIdx)}
                     >
                       <CoverArt coverArt={album.cover_art} artist={album.artist} albumName={album.name} size={80} className="w-8 h-8 rounded shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -275,8 +540,11 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                       key={genre.value}
                       ref={setRowRef(flatIdx)}
                       className={`track-row flex items-center gap-3 px-4 py-2 cursor-pointer ${flatIdx === activeIndex ? 'track-row-active' : ''}`}
-                      onClick={() => { loadGenre(genre.value); onClose(); }}
-                      onMouseEnter={() => handleMouseEnter(flatIdx)}
+                      onClick={() => {
+                        loadGenre(genre.value);
+                        closePalette();
+                      }}
+                      onMouseEnter={() => handleMouseEnterPalette(flatIdx)}
                     >
                       <div className="w-8 h-8 rounded shrink-0 flex items-center justify-center bg-themed-tertiary text-themed-muted">
                         <GenreIcon />
@@ -310,8 +578,11 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
                       key={song.id}
                       ref={setRowRef(flatIdx)}
                       className={`track-row flex items-center gap-3 px-4 py-2 cursor-pointer ${flatIdx === activeIndex ? 'track-row-active' : ''}`}
-                      onClick={() => { playTrack(flatSongToSong(song)); onClose(); }}
-                      onMouseEnter={() => handleMouseEnter(flatIdx)}
+                      onClick={() => {
+                        playTrack(flatSongToSong(song));
+                        closePalette();
+                      }}
+                      onMouseEnter={() => handleMouseEnterPalette(flatIdx)}
                     >
                       <CoverArt coverArt={song.cover_art} artist={song.artist} albumName={song.album} size={80} className="w-8 h-8 rounded shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -334,7 +605,7 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
           </div>
         )}
 
-        {query && !loading && !hasResults && (
+        {query && !loading && !showCommand && !hasResults && (
           <div className="px-4 py-6 text-center text-[13px] text-themed-muted">
             No results for &ldquo;{query}&rdquo;
           </div>

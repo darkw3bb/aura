@@ -1,38 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { FlatSong, Song } from '../../lib/tauri';
+import type { FlatSong } from '../../lib/tauri';
+import { api } from '../../lib/tauri';
+import { flatSongToSong } from '../../lib/flatSong';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { useContextMenuStore } from '../../stores/contextMenuStore';
 import { useKeyboardNav } from '../../hooks/useKeyboardNav';
+import { useTrackTargetStore } from '../../stores/trackTargetStore';
+import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 import { StarRating } from '../Rating/StarRating';
 import { CoverArt } from '../Library/CoverArt';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 const PAGE_SIZE = 50;
-
-export function flatSongToSong(f: FlatSong): Song {
-  return {
-    id: f.id,
-    title: f.title,
-    album: f.album,
-    album_id: f.album_id,
-    artist: f.artist,
-    artist_id: f.artist_id,
-    track: f.track,
-    year: f.year,
-    genre: f.genre,
-    duration: f.duration,
-    bit_rate: f.bit_rate,
-    suffix: f.suffix,
-    content_type: f.content_type,
-    cover_art: f.cover_art,
-    user_rating: f.user_rating,
-    disc_number: f.disc_number,
-    play_count: f.play_count,
-    created: f.created,
-  };
-}
 
 function formatDate(iso?: string): string {
   if (!iso) return '';
@@ -102,6 +83,8 @@ interface TrackRowProps {
   showPlayCount?: boolean;
   showAdded?: boolean;
   showArt?: boolean;
+  showTagPills?: boolean;
+  tagNames: string[];
   focused: boolean;
   onPlay: (index: number) => void;
   onRatingChange: (trackId: string, rating: number) => void;
@@ -122,6 +105,8 @@ const TrackRow = memo(function TrackRow({
   showPlayCount,
   showAdded,
   showArt,
+  showTagPills = true,
+  tagNames,
   focused,
   onPlay,
   onRatingChange,
@@ -141,6 +126,7 @@ const TrackRow = memo(function TrackRow({
         transform: `translateY(${start}px)`,
       }}
       className="track-row flex items-center gap-3 px-6 cursor-pointer"
+      data-track-row
       data-kbd-idx={index}
       data-focused={focused}
       onDoubleClick={() => onPlay(index)}
@@ -157,9 +143,27 @@ const TrackRow = memo(function TrackRow({
         )}
       </span>
       {showArt && <CoverArt coverArt={track.cover_art} artist={track.artist} albumName={track.album} size={80} className="w-8 h-8 rounded shrink-0" />}
-      <span className={`flex-1 min-w-0 text-[13px] truncate ${isCurrentTrack ? 'text-themed-accent' : 'text-themed-primary'}`}>
-        {track.title}
-      </span>
+      <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 overflow-hidden">
+        <span className={`text-[13px] truncate ${isCurrentTrack ? 'text-themed-accent' : 'text-themed-primary'}`}>
+          {track.title}
+        </span>
+        {showTagPills && tagNames.length > 0 && (
+          <div className="flex flex-wrap gap-1 overflow-hidden max-h-[18px]">
+            {tagNames.slice(0, 5).map((t) => (
+              <span
+                key={t}
+                className="text-[9px] leading-tight px-1.5 py-0.5 rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[100px] shrink-0"
+                title={t}
+              >
+                {t}
+              </span>
+            ))}
+            {tagNames.length > 5 && (
+              <span className="text-[9px] text-themed-muted shrink-0">+{tagNames.length - 5}</span>
+            )}
+          </div>
+        )}
+      </div>
       <span className="w-36 min-w-0 text-[13px] truncate text-themed-secondary">
         {track.artist_id ? (
           <button
@@ -218,6 +222,9 @@ const TrackRow = memo(function TrackRow({
   prev.showPlayCount === next.showPlayCount &&
   prev.showAdded === next.showAdded &&
   prev.showArt === next.showArt &&
+  prev.showTagPills === next.showTagPills &&
+  prev.tagNames.length === next.tagNames.length &&
+  prev.tagNames.every((t, i) => t === next.tagNames[i]) &&
   prev.focused === next.focused
 );
 
@@ -239,7 +246,10 @@ interface VirtualTrackListProps {
   sortField?: string;
   sortDirection?: 'asc' | 'desc';
   onSortChange?: (field: string) => void;
+  showTagPills?: boolean;
 }
+
+const EMPTY_TAG_LIST: string[] = [];
 
 export function VirtualTrackList({
   fetchPage,
@@ -254,8 +264,10 @@ export function VirtualTrackList({
   sortField,
   sortDirection,
   onSortChange,
+  showTagPills = true,
 }: VirtualTrackListProps) {
   const [tracks, setTracks] = useState<FlatSong[]>([]);
+  const [tagByTrackId, setTagByTrackId] = useState<Record<string, string[]>>({});
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -333,10 +345,12 @@ export function VirtualTrackList({
 
   // ---- Virtualizer (onChange replaces the old unstable-dep useEffect) ----
 
+  const rowHeight = showTagPills ? 56 : 52;
+
   const rowVirtualizer = useVirtualizer({
     count: tracks.length + (hasMore ? 1 : 0),
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 52,
+    estimateSize: () => rowHeight,
     overscan: 20,
     onChange: (instance) => {
       const items = instance.getVirtualItems();
@@ -374,6 +388,83 @@ export function VirtualTrackList({
     onActivate: handlePlay,
     scrollToIndex,
   });
+
+  useEffect(() => {
+    const song = focusIndex >= 0 ? songsRef.current[focusIndex] ?? null : null;
+    useTrackTargetStore.getState().setKeyboardTarget(song);
+    return () => {
+      useTrackTargetStore.getState().setKeyboardTarget(null);
+    };
+  }, [focusIndex, tracks]);
+
+  useEffect(() => {
+    return () => {
+      useTrackTargetStore.getState().setHoverTarget(null);
+    };
+  }, [resetKey]);
+
+  useEffect(() => {
+    if (!showTagPills || tracks.length === 0) {
+      setTagByTrackId({});
+      return;
+    }
+    const ids = tracks.map((t) => t.id);
+    const t = window.setTimeout(() => {
+      const chunkSize = 120;
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        chunks.push(ids.slice(i, i + chunkSize));
+      }
+      Promise.all(chunks.map((c) => api.getCachedTagsForTracks(c)))
+        .then((parts) => {
+          const next: Record<string, string[]> = {};
+          for (const part of parts) {
+            for (const e of part) {
+              const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
+              next[id] = e.tags;
+            }
+          }
+          setTagByTrackId(next);
+        })
+        .catch(() => {});
+    }, 200);
+    return () => clearTimeout(t);
+  }, [tracks, showTagPills]);
+
+  useEffect(() => {
+    const onTags = () => {
+      if (!showTagPills || tracks.length === 0) return;
+      const ids = tracks.map((t) => t.id);
+      const chunkSize = 120;
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        chunks.push(ids.slice(i, i + chunkSize));
+      }
+      Promise.all(chunks.map((c) => api.getCachedTagsForTracks(c)))
+        .then((parts) => {
+          const next: Record<string, string[]> = {};
+          for (const part of parts) {
+            for (const e of part) {
+              const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
+              next[id] = e.tags;
+            }
+          }
+          setTagByTrackId(next);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('aura-tags-changed', onTags);
+    return () => window.removeEventListener('aura-tags-changed', onTags);
+  }, [tracks, showTagPills]);
+
+  const handleListMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      handleMouseMove();
+      const el = (e.target as HTMLElement).closest('[data-track-row]');
+      if (!el) useTrackTargetStore.getState().setHoverTarget(null);
+    },
+    [handleMouseMove],
+  );
 
   const handleRatingChange = useCallback(
     async (trackId: string, rating: number) => {
@@ -420,7 +511,7 @@ export function VirtualTrackList({
         <span className="w-14 text-right">Time</span>
       </div>
 
-      <div ref={parentRef} className="flex-1 overflow-y-auto" onMouseMove={handleMouseMove}>
+      <div ref={parentRef} className="flex-1 overflow-y-auto" onMouseMove={handleListMouseMove}>
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -450,6 +541,7 @@ export function VirtualTrackList({
             }
 
             const itemProps = getItemProps(virtualRow.index);
+            const song = songsRef.current[virtualRow.index];
 
             return (
               <TrackRow
@@ -464,19 +556,27 @@ export function VirtualTrackList({
                 showPlayCount={showPlayCount}
                 showAdded={showAdded}
                 showArt={showTrackListArt}
+                showTagPills={showTagPills}
+                tagNames={tagByTrackId[track.id] ?? EMPTY_TAG_LIST}
                 focused={focusIndex === virtualRow.index}
                 onPlay={handlePlay}
                 onRatingChange={handleRatingChange}
                 onArtistClick={loadArtist}
                 onAlbumClick={loadAlbum}
-                onMouseEnter={itemProps.onMouseEnter}
+                onMouseEnter={() => {
+                  itemProps.onMouseEnter();
+                  if (song) useTrackTargetStore.getState().setHoverTarget(song);
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  const song = songsRef.current[virtualRow.index];
                   if (song) {
                     showContextMenu(e.clientX, e.clientY, [
                       { label: 'Play Next', onClick: () => insertNextInQueue(song) },
                       { label: 'Add to Queue', onClick: () => addToQueue(song) },
+                      {
+                        label: 'Tag…',
+                        onClick: () => useCommandPaletteStore.getState().openPaletteTagStep(song),
+                      },
                     ]);
                   }
                 }}

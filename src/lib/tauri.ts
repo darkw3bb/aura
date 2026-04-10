@@ -161,6 +161,21 @@ export interface DailyPlay {
   duration_secs: number;
 }
 
+export interface PlaylistSummary {
+  id: string;
+  name: string;
+  song_count?: number;
+  duration?: number;
+  created?: string;
+  owner?: string;
+  public?: boolean;
+}
+
+export interface TrackTagsEntry {
+  trackId: string;
+  tags: string[];
+}
+
 export interface StatsData {
   total_tracks: number;
   total_albums: number;
@@ -246,4 +261,15 @@ export const api = {
 
   recordPlay: (trackId: string) => invoke<void>('record_play', { trackId }),
   getStats: (period: string) => invoke<StatsData>('get_stats', { period }),
+
+  syncPlaylistsToCache: () => invoke<number>('sync_playlists_to_cache'),
+  listCachedPlaylists: () => invoke<PlaylistSummary[]>('list_cached_playlists'),
+  getCachedPlaylistTracks: (playlistId: string, offset?: number, limit?: number) =>
+    invoke<FlatSong[]>('get_cached_playlist_tracks', { playlist_id: playlistId, offset, limit }),
+  getCachedTrackTags: (trackId: string) =>
+    invoke<string[]>('get_cached_track_tags', { track_id: trackId }),
+  getCachedTagsForTracks: (trackIds: string[]) =>
+    invoke<TrackTagsEntry[]>('get_cached_tags_for_tracks', { track_ids: trackIds }),
+  applyPlaylistTag: (song: Song, tagName: string) =>
+    invoke<string>('apply_playlist_tag', { song, tag_name: tagName }),
 };

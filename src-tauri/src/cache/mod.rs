@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::subsonic::models::{
     Album, AlbumDetail, AlbumStat, Artist, ArtistDetail, ArtistStat, DailyPlay, FlatSong, Genre,
-    GenreStat, Song, StatsData, TrackStat,
+    GenreStat, PlaylistSummary, Song, StatsData, TrackStat,
 };
 
 pub struct CacheDb {
@@ -94,6 +94,18 @@ impl CacheDb {
             );
             CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
             CREATE INDEX IF NOT EXISTS idx_play_history_track ON play_history(track_id);
+            CREATE TABLE IF NOT EXISTS playlists (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS playlist_tracks (
+                playlist_id TEXT NOT NULL,
+                track_id TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (playlist_id, track_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_playlist_tracks_track ON playlist_tracks(track_id);
+            CREATE INDEX IF NOT EXISTS idx_playlist_tracks_pl_pos ON playlist_tracks(playlist_id, position);
             ",
             )
             .map_err(|e| format!("Schema error: {}", e))?;
@@ -1076,6 +1088,293 @@ impl CacheDb {
             Ok(DailyPlay { date: r.get(0)?, count: r.get(1)?, duration_secs: r.get(2)? })
         }).map_err(|e| format!("daily_plays query: {}", e))?;
         rows.collect::<Result<Vec<_>, _>>().map_err(|e| format!("daily_plays row: {}", e))
+    }
+
+    // -- Playlists (Navidrome tags) --
+
+    pub fn upsert_playlist_row(&self, id: &str, name: &str) -> Result<(), String> {
+        self.conn
+            .execute(
+                "INSERT INTO playlists (id, name) VALUES (?1, ?2)
+                 ON CONFLICT(id) DO UPDATE SET name = excluded.name",
+                params![id, name],
+            )
+            .map_err(|e| format!("upsert_playlist_row: {}", e))?;
+        Ok(())
+    }
+
+    pub fn delete_playlists_not_in(&self, keep_ids: &[String]) -> Result<(), String> {
+        if keep_ids.is_empty() {
+            self.conn
+                .execute("DELETE FROM playlist_tracks", [])
+                .map_err(|e| format!("delete_playlists_not_in: {}", e))?;
+            self.conn
+                .execute("DELETE FROM playlists", [])
+                .map_err(|e| format!("delete_playlists_not_in: {}", e))?;
+            return Ok(());
+        }
+        let placeholders = keep_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql_tracks = format!(
+            "DELETE FROM playlist_tracks WHERE playlist_id NOT IN ({})",
+            placeholders
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql_tracks)
+            .map_err(|e| format!("delete_playlists_not_in: {}", e))?;
+        stmt.execute(rusqlite::params_from_iter(keep_ids.iter()))
+            .map_err(|e| format!("delete_playlists_not_in tracks: {}", e))?;
+
+        let sql_pl = format!("DELETE FROM playlists WHERE id NOT IN ({})", placeholders);
+        let mut stmt = self
+            .conn
+            .prepare(&sql_pl)
+            .map_err(|e| format!("delete_playlists_not_in: {}", e))?;
+        stmt.execute(rusqlite::params_from_iter(keep_ids.iter()))
+            .map_err(|e| format!("delete_playlists_not_in pl: {}", e))?;
+        Ok(())
+    }
+
+    pub fn clear_playlist_tracks(&self, playlist_id: &str) -> Result<(), String> {
+        self.conn
+            .execute(
+                "DELETE FROM playlist_tracks WHERE playlist_id = ?1",
+                params![playlist_id],
+            )
+            .map_err(|e| format!("clear_playlist_tracks: {}", e))?;
+        Ok(())
+    }
+
+    pub fn set_playlist_tracks_bulk(
+        &self,
+        playlist_id: &str,
+        track_ids: &[String],
+    ) -> Result<(), String> {
+        self.clear_playlist_tracks(playlist_id)?;
+        let tx = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|e| format!("set_playlist_tracks_bulk tx: {}", e))?;
+        for (pos, tid) in track_ids.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?1, ?2, ?3)",
+                params![playlist_id, tid, pos as i32],
+            )
+            .map_err(|e| format!("set_playlist_tracks_bulk insert: {}", e))?;
+        }
+        tx.commit()
+            .map_err(|e| format!("set_playlist_tracks_bulk commit: {}", e))?;
+        Ok(())
+    }
+
+    pub fn append_playlist_track_if_missing(
+        &self,
+        playlist_id: &str,
+        track_id: &str,
+    ) -> Result<bool, String> {
+        let exists: i32 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2",
+                params![playlist_id, track_id],
+                |r| r.get(0),
+            )
+            .map_err(|e| format!("append_playlist_track_if_missing: {}", e))?;
+        if exists > 0 {
+            return Ok(false);
+        }
+        let max_pos: Option<i32> = self
+            .conn
+            .query_row(
+                "SELECT MAX(position) FROM playlist_tracks WHERE playlist_id = ?1",
+                params![playlist_id],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| format!("append_playlist_track_if_missing max: {}", e))?
+            .flatten();
+        let pos = max_pos.map(|m| m + 1).unwrap_or(0);
+        self.conn
+            .execute(
+                "INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?1, ?2, ?3)",
+                params![playlist_id, track_id, pos],
+            )
+            .map_err(|e| format!("append_playlist_track_if_missing insert: {}", e))?;
+        Ok(true)
+    }
+
+    pub fn get_cached_playlists(&self) -> Result<Vec<PlaylistSummary>, String> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT p.id, p.name,
+                        (SELECT COUNT(*) FROM playlist_tracks pt WHERE pt.playlist_id = p.id) as cnt
+                 FROM playlists p
+                 ORDER BY LOWER(p.name)",
+            )
+            .map_err(|e| format!("get_cached_playlists: {}", e))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(PlaylistSummary {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    song_count: row.get(2)?,
+                    duration: None,
+                    created: None,
+                    owner: None,
+                    public: None,
+                })
+            })
+            .map_err(|e| format!("get_cached_playlists query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("get_cached_playlists row: {}", e))
+    }
+
+    pub fn find_playlist_id_by_name_ci(&self, name: &str) -> Result<Option<String>, String> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Ok(None);
+        }
+        self.conn
+            .query_row(
+                "SELECT id FROM playlists WHERE LOWER(name) = LOWER(?1) LIMIT 1",
+                params![trimmed],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| format!("find_playlist_id_by_name_ci: {}", e))
+    }
+
+    pub fn get_playlist_track_count(&self, playlist_id: &str) -> Result<i32, String> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?1",
+                params![playlist_id],
+                |r| r.get(0),
+            )
+            .map_err(|e| format!("get_playlist_track_count: {}", e))
+    }
+
+    pub fn get_flat_songs_for_playlist(
+        &self,
+        playlist_id: &str,
+        offset: i32,
+        limit: i32,
+    ) -> Result<Vec<FlatSong>, String> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT t.id, t.title, t.album, t.album_id, t.artist, t.artist_id,
+                        t.track_num, t.year, t.genre, t.duration, t.bit_rate, t.cover_art,
+                        t.user_rating, t.disc_number, t.play_count, t.created
+                 FROM playlist_tracks pt
+                 JOIN tracks t ON t.id = pt.track_id
+                 WHERE pt.playlist_id = ?1
+                 ORDER BY pt.position ASC, t.title ASC
+                 LIMIT ?2 OFFSET ?3",
+            )
+            .map_err(|e| format!("get_flat_songs_for_playlist: {}", e))?;
+        let rows = stmt
+            .query_map(params![playlist_id, limit, offset], |row| {
+                Ok(FlatSong {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    album: row.get(2)?,
+                    album_id: row.get(3)?,
+                    artist: row.get(4)?,
+                    artist_id: row.get(5)?,
+                    track: row.get(6)?,
+                    year: row.get(7)?,
+                    genre: row.get(8)?,
+                    duration: row.get(9)?,
+                    bit_rate: row.get(10)?,
+                    cover_art: row.get(11)?,
+                    user_rating: row.get(12)?,
+                    disc_number: row.get(13)?,
+                    play_count: row.get(14)?,
+                    created: row.get(15)?,
+                })
+            })
+            .map_err(|e| format!("get_flat_songs_for_playlist query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("get_flat_songs_for_playlist row: {}", e))
+    }
+
+    pub fn get_tag_names_for_track(&self, track_id: &str) -> Result<Vec<String>, String> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT p.name FROM playlists p
+                 JOIN playlist_tracks pt ON pt.playlist_id = p.id
+                 WHERE pt.track_id = ?1
+                 ORDER BY LOWER(p.name)",
+            )
+            .map_err(|e| format!("get_tag_names_for_track: {}", e))?;
+        let rows = stmt
+            .query_map(params![track_id], |row| row.get(0))
+            .map_err(|e| format!("get_tag_names_for_track query: {}", e))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("get_tag_names_for_track row: {}", e))
+    }
+
+    pub fn playlist_has_track(&self, playlist_id: &str, track_id: &str) -> Result<bool, String> {
+        let n: i32 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2",
+                params![playlist_id, track_id],
+                |r| r.get(0),
+            )
+            .map_err(|e| format!("playlist_has_track: {}", e))?;
+        Ok(n > 0)
+    }
+
+    /// For each track id (in the same order), return tag names from local cache.
+    pub fn get_tags_for_track_ids(&self, track_ids: &[String]) -> Result<Vec<Vec<String>>, String> {
+        if track_ids.is_empty() {
+            return Ok(vec![]);
+        }
+        let placeholders = track_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT pt.track_id, p.name
+             FROM playlist_tracks pt
+             JOIN playlists p ON p.id = pt.playlist_id
+             WHERE pt.track_id IN ({})
+             ORDER BY pt.track_id, LOWER(p.name)",
+            placeholders
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(|e| format!("get_tags_for_track_ids: {}", e))?;
+
+        let mut rows = stmt
+            .query(rusqlite::params_from_iter(track_ids.iter()))
+            .map_err(|e| format!("get_tags_for_track_ids query: {}", e))?;
+
+        use std::collections::HashMap;
+        let mut map: HashMap<String, Vec<String>> = HashMap::new();
+        while let Some(row) = rows
+            .next()
+            .map_err(|e| format!("get_tags_for_track_ids row: {}", e))?
+        {
+            let tid: String = row.get(0).map_err(|e| format!("get_tags_for_track_ids: {}", e))?;
+            let name: String = row.get(1).map_err(|e| format!("get_tags_for_track_ids: {}", e))?;
+            map.entry(tid).or_default().push(name);
+        }
+
+        Ok(track_ids
+            .iter()
+            .map(|id| map.remove(id).unwrap_or_default())
+            .collect())
     }
 }
 

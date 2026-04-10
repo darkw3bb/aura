@@ -64,7 +64,15 @@ pub async fn connect(
     *state.cache.lock() = Some(cache);
     *state.app_dir.lock() = Some(cache_dir);
 
-    crate::sync::start_background_sync(Arc::clone(&state), app);
+    crate::sync::start_background_sync(Arc::clone(&state), app.clone());
+
+    let state_pl = Arc::clone(&state);
+    tauri::async_runtime::spawn(async move {
+        match do_sync_playlists_to_cache(state_pl.as_ref()).await {
+            Ok(n) => log::info!("[playlists] synced {} playlists", n),
+            Err(e) => log::warn!("[playlists] initial sync failed: {}", e),
+        }
+    });
 
     Ok(())
 }
@@ -783,4 +791,169 @@ pub async fn get_cached_tracks_by_rating(
     let cache = state.cache.lock();
     let cache = cache.as_ref().ok_or("Cache not initialized")?;
     cache.get_tracks_by_rating(offset.unwrap_or(0), limit.unwrap_or(50))
+}
+
+// -- Playlists (tags) --
+
+pub async fn do_sync_playlists_to_cache(state: &AppState) -> Result<u32, String> {
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    let summaries = client.get_playlists().await?;
+    let keep_ids: Vec<String> = summaries.iter().map(|p| p.id.clone()).collect();
+
+    for pl in &summaries {
+        let detail = client.get_playlist(&pl.id).await?;
+        let track_ids: Vec<String> = detail
+            .entry
+            .as_ref()
+            .map(|entries| entries.iter().map(|s| s.id.clone()).collect())
+            .unwrap_or_default();
+
+        let cache = state.cache.lock();
+        let cache = cache.as_ref().ok_or("Cache not initialized")?;
+        cache.upsert_playlist_row(&pl.id, &pl.name)?;
+        cache.set_playlist_tracks_bulk(&pl.id, &track_ids)?;
+        if let Some(entries) = &detail.entry {
+            for song in entries {
+                cache.upsert_track(song)?;
+            }
+        }
+    }
+
+    {
+        let cache = state.cache.lock();
+        let cache = cache.as_ref().ok_or("Cache not initialized")?;
+        cache.delete_playlists_not_in(&keep_ids)?;
+    }
+
+    Ok(summaries.len() as u32)
+}
+
+#[tauri::command]
+pub async fn sync_playlists_to_cache(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<u32, String> {
+    do_sync_playlists_to_cache(state.inner().as_ref()).await
+}
+
+#[tauri::command]
+pub async fn list_cached_playlists(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Vec<PlaylistSummary>, String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.get_cached_playlists()
+}
+
+#[tauri::command]
+pub async fn get_cached_playlist_tracks(
+    state: tauri::State<'_, Arc<AppState>>,
+    playlist_id: String,
+    offset: Option<i32>,
+    limit: Option<i32>,
+) -> Result<Vec<FlatSong>, String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.get_flat_songs_for_playlist(
+        &playlist_id,
+        offset.unwrap_or(0),
+        limit.unwrap_or(50),
+    )
+}
+
+#[tauri::command]
+pub async fn get_cached_track_tags(
+    state: tauri::State<'_, Arc<AppState>>,
+    track_id: String,
+) -> Result<Vec<String>, String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.get_tag_names_for_track(&track_id)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackTagsEntry {
+    pub track_id: String,
+    pub tags: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn get_cached_tags_for_tracks(
+    state: tauri::State<'_, Arc<AppState>>,
+    track_ids: Vec<String>,
+) -> Result<Vec<TrackTagsEntry>, String> {
+    if track_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    let tag_lists = cache.get_tags_for_track_ids(&track_ids)?;
+    let out: Vec<TrackTagsEntry> = track_ids
+        .into_iter()
+        .zip(tag_lists.into_iter())
+        .map(|(track_id, tags)| TrackTagsEntry { track_id, tags })
+        .collect();
+    Ok(out)
+}
+
+#[tauri::command]
+pub async fn apply_playlist_tag(
+    state: tauri::State<'_, Arc<AppState>>,
+    song: Song,
+    tag_name: String,
+) -> Result<String, String> {
+    let name = tag_name.trim().to_string();
+    if name.is_empty() {
+        return Err("Tag name is empty".to_string());
+    }
+
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+
+    {
+        let cache = state.cache.lock();
+        let cache = cache.as_ref().ok_or("Cache not initialized")?;
+        cache.upsert_track(&song)?;
+    }
+
+    let playlist_id = {
+        let cache = state.cache.lock();
+        let cache = cache.as_ref().ok_or("Cache not initialized")?;
+        cache.find_playlist_id_by_name_ci(&name)?
+    };
+
+    let playlist_id = if let Some(pid) = playlist_id {
+        pid
+    } else {
+        let created = client.create_playlist(&name).await?;
+        let id = created.id.clone();
+        let cache = state.cache.lock();
+        let cache = cache.as_ref().ok_or("Cache not initialized")?;
+        cache.upsert_playlist_row(&created.id, &created.name)?;
+        id
+    };
+
+    {
+        let cache = state.cache.lock();
+        let cache = cache.as_ref().ok_or("Cache not initialized")?;
+        if cache.playlist_has_track(&playlist_id, &song.id)? {
+            return Ok(playlist_id);
+        }
+    }
+
+    if let Err(e) = client
+        .update_playlist_add_song(&playlist_id, &song.id)
+        .await
+    {
+        let el = e.to_lowercase();
+        if el.contains("already") || el.contains("duplicate") || el.contains("exist") {
+            // treat as idempotent success
+        } else {
+            return Err(e);
+        }
+    }
+
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    let _ = cache.append_playlist_track_if_missing(&playlist_id, &song.id)?;
+    Ok(playlist_id)
 }

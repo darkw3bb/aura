@@ -197,6 +197,12 @@ pub fn run() {
             commands::search_all,
             commands::record_play,
             commands::get_stats,
+            commands::sync_playlists_to_cache,
+            commands::list_cached_playlists,
+            commands::get_cached_playlist_tracks,
+            commands::get_cached_track_tags,
+            commands::get_cached_tags_for_tracks,
+            commands::apply_playlist_tag,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
