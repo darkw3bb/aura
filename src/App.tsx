@@ -19,6 +19,8 @@ import { YearsView } from './components/Library/YearsView';
 import { StatsView } from './components/Stats/StatsView';
 import { ContextMenu } from './components/ContextMenu/ContextMenu';
 import { UpdateBanner } from './components/UpdateBanner';
+import { MaestroPanel, MaestroFAB } from './components/Agent/AgentChat';
+import { useAgentChatStore } from './stores/agentChatStore';
 
 function App() {
   const { view, setView, connected, connect, canGoBack, canGoForward, goBack, goForward } = useLibraryStore();
@@ -72,6 +74,10 @@ function App() {
       e.preventDefault();
       useCommandPaletteStore.getState().togglePalette();
     }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+      e.preventDefault();
+      useAgentChatStore.getState().toggle();
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === '[') {
       e.preventDefault();
       const { canGoBack, goBack } = useLibraryStore.getState();
@@ -89,6 +95,7 @@ function App() {
         clearTimeout(goTimeoutRef.current);
       }
       useCommandPaletteStore.getState().closePalette();
+      useAgentChatStore.getState().close();
     }
     if (e.code === 'Space') {
       if (isTyping) {
@@ -359,12 +366,15 @@ function App() {
             )}
           </div>
         </div>
+
+        {connected && <MaestroPanel />}
       </div>
 
       {connected && <PlayerBar />}
 
       <SearchOverlay />
       <ContextMenu />
+      {connected && <MaestroFAB />}
     </div>
   );
 }

@@ -208,6 +208,8 @@ pub fn run() {
             commands::rename_playlist,
             commands::delete_playlist,
             commands::set_playlist_color,
+            commands::get_cached_track,
+            commands::proxy_anthropic,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

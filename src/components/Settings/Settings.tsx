@@ -1,18 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLibraryStore } from '../../stores/libraryStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUsageStore, usageForPeriod } from '../../stores/usageStore';
 import { themes } from '../../themes';
+import { MODELS } from '../../lib/models';
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return n.toString();
+}
 
 export function Settings() {
   const { connect, error, connected, syncing, syncMessage, syncLibrary } =
     useLibraryStore();
   const { themeId, setTheme } = useThemeStore();
-  const { showTrackListArt, setShowTrackListArt } = useSettingsStore();
+  const { showTrackListArt, setShowTrackListArt, anthropicApiKey, setAnthropicApiKey, maestroModel, setMaestroModel } = useSettingsStore();
+  const usageLog = useUsageStore(s => s.log);
+  const clearUsage = useUsageStore(s => s.clearUsage);
+  const allUsage = useMemo(() => usageForPeriod(usageLog, 'all'), [usageLog]);
   const [url, setUrl] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -102,6 +114,87 @@ export function Settings() {
             />
           </button>
         </label>
+
+        <h2 className="text-2xl font-bold mb-4 text-themed-primary">Maestro</h2>
+        <div className="mb-8 space-y-3">
+          <p className="text-xs text-themed-muted">
+            Enter your Anthropic API key to enable Maestro.
+            Get one at{' '}
+            <span className="text-themed-accent">console.anthropic.com</span>
+          </p>
+          <div className="relative">
+            <input
+              type={showApiKey ? 'text' : 'password'}
+              placeholder="sk-ant-..."
+              value={anthropicApiKey}
+              onChange={(e) => setAnthropicApiKey(e.target.value)}
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey(!showApiKey)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-themed-muted hover:text-themed-primary transition-colors cursor-pointer"
+            >
+              {showApiKey ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {anthropicApiKey && (
+            <p className="text-xs text-green-400">API key configured</p>
+          )}
+          <div>
+            <label htmlFor="ae-model" className="block text-xs text-themed-muted mb-1.5">Model</label>
+            <select
+              id="ae-model"
+              value={maestroModel}
+              onChange={(e) => setMaestroModel(e.target.value)}
+              className={inputClass}
+            >
+              {MODELS.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.label} — ${m.costPerMInput}/${m.costPerMOutput} per M tokens
+                </option>
+              ))}
+            </select>
+          </div>
+          {allUsage.requests > 0 && (
+            <div className="mt-3 p-3 rounded-lg bg-themed-tertiary space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-themed-primary">Usage</span>
+                <button
+                  onClick={clearUsage}
+                  className="text-[11px] text-themed-muted hover:text-themed-primary transition-colors cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <p className="text-[11px] text-themed-muted">Requests</p>
+                  <p className="text-sm font-medium text-themed-primary">{allUsage.requests}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-themed-muted">Tokens</p>
+                  <p className="text-sm font-medium text-themed-primary">{formatTokens(allUsage.inputTokens + allUsage.outputTokens)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-themed-muted">Cost</p>
+                  <p className="text-sm font-medium text-themed-primary">${allUsage.cost.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         <h2 className="text-2xl font-bold mb-6 text-themed-primary">
           {connected ? 'Server Settings' : 'Connect to Navidrome'}

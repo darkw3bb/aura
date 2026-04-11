@@ -312,4 +312,7 @@
     background: var(--pill-teal-bg, var(--bg-tertiary));
     color: var(--pill-teal-text, var(--text-secondary));
   }
+
+  .agent-markdown > :first-child { margin-top: 0; }
+  .agent-markdown > :last-child { margin-bottom: 0; }
 }

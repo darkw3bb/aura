@@ -25,6 +25,12 @@
   </a>
 </p>
 
+<p align="center">
+  <img src="public/maestro-recommend.png" width="32%" alt="Maestro recommending introspective tracks" />
+  <img src="public/maestro-tagging.png" width="32%" alt="Maestro building a mood-based playlist" />
+  <img src="public/maestro-playlist.png" width="32%" alt="The finished introspective playlist" />
+</p>
+
 ---
 
 ## Why Aura
@@ -66,6 +72,28 @@ Aura treats playlists like tags. A track can belong to many playlists at once, a
 - **Rename and delete** — rename playlists inline (double-click or Rename button) and delete with confirmation; changes sync to your Navidrome server
 - **Per-playlist colors** — pick from 8 accent-derived color shades so each playlist is visually distinct; colors automatically adapt when you switch themes
 - **Searchable playlists** — playlists appear as results in the Cmd/Ctrl+K command palette alongside artists, albums, and songs
+
+### Maestro — AI agent for your library
+
+Maestro is a built-in AI assistant that lives in a sidebar panel (toggle with Cmd/Ctrl+J). It can read your entire library, analyze your taste, and take real actions — building playlists, tagging tracks, and surfacing music you forgot you had. Powered by the Anthropic Claude API with your own API key.
+
+**How it works with tags.** Maestro is designed to work hand-in-hand with Aura's tagging system. Tell it a mood, a feeling, or a vibe — "introspective late-night music", "upbeat workout energy", "melancholy rainy day" — and it will dig through your albums, artists, genres, and ratings to find tracks that fit. It tags them into a playlist automatically, so you end up with deeply personal, emotionally curated collections that no algorithm could generate. You can keep refining: ask it to find 10 more tracks that match the vibe, or to pull from a specific artist's catalog.
+
+**What Maestro can do:**
+
+- **Search your library** — find tracks, albums, and artists by name, keyword, or description
+- **Browse everything** — list all albums, all artists, all genres, all playlists; filter albums and artists by name
+- **Deep-dive into artists** — fetch an artist's full discography and every track across all their albums in one shot
+- **Explore albums** — get the complete tracklist, ratings, and metadata for any album
+- **Analyze your taste** — look at your rated tracks, find patterns, and suggest music based on what you already love
+- **Filter by genre** — pull tracks from any genre with pagination for large collections
+- **Build playlists by mood** — tag tracks into new or existing playlists based on feelings, moods, lyrical themes, or sonic qualities
+- **Bulk-tag tracks** — tag up to 50 tracks at once when building larger playlists
+- **See what's playing** — check the current track, playback position, and upcoming queue to make contextual suggestions
+- **Interactive responses** — every album, artist, playlist, and track mentioned in a response is a clickable button that navigates or plays instantly
+- **Markdown formatting** — responses render with full rich text: bold, lists, code blocks, headings
+
+**Usage tracking:** Maestro tracks token usage and estimated cost per session. View totals in Settings or broken down by period (week/month/all time) on the Stats page. Reset anytime.
 
 ### Speed and efficiency
 
@@ -119,6 +147,7 @@ Head to the **[Releases](https://github.com/darkw3bb/aura/releases)** page and g
 | `J` / `K` | Move focus down / up in lists and grids |
 | `Enter` | Activate focused item (open album, play track) |
 | `Cmd/Ctrl + K` | Open search and command palette (type `tag` for **Apply tag**; commands appear above results) |
+| `Cmd/Ctrl + J` | Toggle Maestro AI sidebar |
 | `G` then `L` | Go to Playlists (tags synced from Navidrome as playlists) |
 | `Cmd/Ctrl + [` | Navigate back |
 | `Cmd/Ctrl + ]` | Navigate forward |
@@ -143,6 +172,8 @@ Head to the **[Releases](https://github.com/darkw3bb/aura/releases)** page and g
 | Cache | SQLite + FTS5 via rusqlite |
 | Async | Tokio |
 | Updates | tauri-plugin-updater |
+| AI | Anthropic Claude API (via Rust proxy) |
+| Markdown | react-markdown |
 
 ---
 
@@ -217,13 +248,19 @@ src/                 React + TypeScript frontend
     Queue/           Queue panel with drag-and-drop reordering
     Search/          Search + command palette (Cmd+K; tags via Navidrome playlists)
     Playlist/        Playlists page (tag sidebar + tracks)
-    Settings/        Server connection, theme picker, display options
+    Agent/           Maestro AI sidebar (chat panel, action buttons, markdown)
+    Settings/        Server connection, theme picker, display options, Maestro config
+    Stats/           Listening stats + Maestro usage tracking
     Rating/          Star rating component
     UpdateBanner.tsx In-app update prompt
-  stores/            Zustand state (library, player, settings, theme, context menu)
+  stores/            Zustand state (library, player, settings, theme, context menu,
+                       agent chat, usage tracking)
   hooks/             useSearch, useUpdater, useKeyboardNav, useTiltHover
   themes/            15 color themes (midnight, nord, catppuccin, aura-light, etc.)
-  lib/               Typed Tauri IPC wrappers
+  lib/
+    tauri.ts         Typed Tauri IPC wrappers
+    agentTools.ts    Anthropic tool schemas + dispatcher (library read/write tools)
+    agentLoop.ts     Multi-turn agent conversation loop with tool execution
 ```
 
 ---
@@ -239,6 +276,7 @@ src/                 React + TypeScript frontend
 - [ ] Waveform seekbar
 - [ ] Mini player mode
 - [ ] Multiple server support
+- [x] AI agent (Maestro) — mood-based playlist builder and library research assistant
 - [ ] Smart playlists
 - [ ] ReplayGain volume normalization
 - [ ] Crossfade
