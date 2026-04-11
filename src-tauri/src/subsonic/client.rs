@@ -283,6 +283,13 @@ impl SubsonicClient {
         Ok(())
     }
 
+    pub async fn rename_playlist(&self, id: &str, name: &str) -> Result<(), String> {
+        let _: EmptyBody = self
+            .get("updatePlaylist", &[("playlistId", id), ("name", name)])
+            .await?;
+        Ok(())
+    }
+
     pub async fn delete_playlist(&self, id: &str) -> Result<(), String> {
         let _: EmptyBody = self.get("deletePlaylist", &[("id", id)]).await?;
         Ok(())

@@ -29,7 +29,8 @@ type SearchItem =
   | { type: 'artist'; data: Artist }
   | { type: 'album'; data: Album }
   | { type: 'genre'; data: Genre }
-  | { type: 'song'; data: FlatSong };
+  | { type: 'song'; data: FlatSong }
+  | { type: 'playlist'; data: PlaylistSummary };
 
 type PaletteRow =
   | { kind: 'command'; cmd: 'apply-tag'; disabled: boolean }
@@ -74,6 +75,19 @@ function TrackIcon() {
   );
 }
 
+function PlaylistIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  );
+}
+
 export function SearchOverlay() {
   const open = useCommandPaletteStore((s) => s.open);
   const startInTagStep = useCommandPaletteStore((s) => s.startInTagStep);
@@ -93,7 +107,8 @@ export function SearchOverlay() {
 
   const { query, results, loading, search, clear } = useSearch();
   const { playTrack } = usePlayerStore();
-  const { loadArtist, loadAlbum, loadGenre } = useLibraryStore();
+  const { loadArtist, loadAlbum, loadGenre, navigateToPlaylist } = useLibraryStore();
+  const [searchPlaylists, setSearchPlaylists] = useState<PlaylistSummary[]>([]);
 
   const loadPlaylists = useCallback(() => {
     return api.listCachedPlaylists().then(setPlaylists).catch(() => setPlaylists([]));
@@ -107,9 +122,11 @@ export function SearchOverlay() {
       setHint(null);
       setTagBusy(false);
       openedDirectToTag.current = false;
+      setSearchPlaylists([]);
       clear();
       return;
     }
+    api.listCachedPlaylists().then(setSearchPlaylists).catch(() => setSearchPlaylists([]));
     if (startInTagStep) {
       setStep('tag');
       openedDirectToTag.current = true;
@@ -118,14 +135,21 @@ export function SearchOverlay() {
     }
   }, [open, startInTagStep, loadPlaylists, clear]);
 
+  const matchedPlaylists = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return searchPlaylists.filter((p) => p.name.toLowerCase().includes(q));
+  }, [query, searchPlaylists]);
+
   const flatItems = useMemo<SearchItem[]>(() => {
     const items: SearchItem[] = [];
+    for (const p of matchedPlaylists) items.push({ type: 'playlist', data: p });
     for (const a of results.artists) items.push({ type: 'artist', data: a });
     for (const a of results.albums) items.push({ type: 'album', data: a });
     for (const g of results.genres) items.push({ type: 'genre', data: g });
     for (const s of results.songs) items.push({ type: 'song', data: s });
     return items;
-  }, [results]);
+  }, [results, matchedPlaylists]);
 
   const paletteRows = useMemo<PaletteRow[]>(() => {
     const rows: PaletteRow[] = [];
@@ -190,10 +214,13 @@ export function SearchOverlay() {
         case 'song':
           playTrack(flatSongToSong(item.data));
           break;
+        case 'playlist':
+          navigateToPlaylist(item.data.name);
+          break;
       }
       closePalette();
     },
-    [loadArtist, loadAlbum, loadGenre, playTrack, closePalette],
+    [loadArtist, loadAlbum, loadGenre, playTrack, navigateToPlaylist, closePalette],
   );
 
   const goToTagStep = useCallback(() => {
@@ -308,10 +335,11 @@ export function SearchOverlay() {
   if (!open) return null;
 
   const { artists, albums, songs, genres } = results;
-  const hasResults = artists.length > 0 || albums.length > 0 || genres.length > 0 || songs.length > 0;
+  const hasResults = artists.length > 0 || albums.length > 0 || genres.length > 0 || songs.length > 0 || matchedPlaylists.length > 0;
   const showCommand = matchesApplyTagCommand(query);
 
-  const artistStartIdx = showCommand ? 1 : 0;
+  const playlistStartIdx = showCommand ? 1 : 0;
+  const artistStartIdx = playlistStartIdx + matchedPlaylists.length;
   const albumStartIdx = artistStartIdx + artists.length;
   const genreStartIdx = albumStartIdx + albums.length;
   const songStartIdx = genreStartIdx + genres.length;
@@ -454,6 +482,42 @@ export function SearchOverlay() {
                   <span className="text-[13px] text-themed-primary">Apply tag</span>
                   <span className="search-type-pill ml-auto">Command</span>
                 </div>
+              </div>
+            )}
+
+            {matchedPlaylists.length > 0 && (
+              <div className="search-group">
+                <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-2 bg-themed-secondary border-b border-themed">
+                  <span className="text-themed-muted"><PlaylistIcon /></span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-themed-muted">Playlists</span>
+                  <span className="text-[10px] text-themed-muted opacity-60">{matchedPlaylists.length}</span>
+                </div>
+                {matchedPlaylists.map((pl, i) => {
+                  const flatIdx = playlistStartIdx + i;
+                  return (
+                    <div
+                      key={pl.id}
+                      ref={setRowRef(flatIdx)}
+                      className={`track-row flex items-center gap-3 px-4 py-2 cursor-pointer ${flatIdx === activeIndex ? 'track-row-active' : ''}`}
+                      onClick={() => {
+                        navigateToPlaylist(pl.name);
+                        closePalette();
+                      }}
+                      onMouseEnter={() => handleMouseEnterPalette(flatIdx)}
+                    >
+                      <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center pill-color-${pl.color ?? 'default'}`}>
+                        <PlaylistIcon />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] truncate text-themed-primary">{pl.name}</p>
+                        {pl.song_count != null && (
+                          <p className="text-[11px] text-themed-muted">{pl.song_count} track{pl.song_count !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                      <span className="search-type-pill">Playlist</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 

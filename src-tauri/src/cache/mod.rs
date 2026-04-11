@@ -1422,6 +1422,16 @@ impl CacheDb {
         Ok(())
     }
 
+    pub fn rename_playlist(&self, id: &str, name: &str) -> Result<(), String> {
+        self.conn
+            .execute(
+                "UPDATE playlists SET name = ?2 WHERE id = ?1",
+                params![id, name],
+            )
+            .map_err(|e| format!("rename_playlist: {}", e))?;
+        Ok(())
+    }
+
     pub fn set_playlist_color(&self, id: &str, color: &str) -> Result<(), String> {
         self.conn
             .execute(

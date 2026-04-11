@@ -72,19 +72,21 @@ function SortHeader({
 // Tag pill with hover-to-remove
 // ---------------------------------------------------------------------------
 
-export function TagPill({ name, trackId, colorClass, onRemove }: {
+export function TagPill({ name, trackId, colorClass, onRemove, onClick }: {
   name: string;
   trackId: string;
   colorClass?: string;
   onRemove?: (trackId: string, tagName: string) => void;
+  onClick?: (tagName: string) => void;
 }) {
   const pillClass = colorClass && colorClass !== 'pill-color-default'
     ? colorClass
     : '';
   return (
     <span
-      className={`group text-[8px] leading-tight pl-1.5 pr-1 py-px rounded-full truncate max-w-[90px] shrink-0 inline-flex items-center gap-0.5 ${pillClass || 'bg-themed-tertiary text-themed-secondary'}`}
+      className={`group text-[8px] leading-tight pl-1.5 pr-1 py-px rounded-full truncate max-w-[90px] shrink-0 inline-flex items-center gap-0.5 ${onClick ? 'cursor-pointer hover:brightness-110' : ''} ${pillClass || 'bg-themed-tertiary text-themed-secondary'}`}
       title={name}
+      onClick={onClick ? (e) => { e.stopPropagation(); e.preventDefault(); onClick(name); } : undefined}
     >
       {name}
       {onRemove && (
@@ -121,6 +123,7 @@ interface TrackRowProps {
   onPlay: (index: number) => void;
   onRatingChange: (trackId: string, rating: number) => void;
   onRemoveTag?: (trackId: string, tagName: string) => void;
+  onTagClick?: (tagName: string) => void;
   onArtistClick: (artistId: string) => void;
   onAlbumClick: (albumId: string) => void;
   onMouseEnter: () => void;
@@ -144,6 +147,7 @@ const TrackRow = memo(function TrackRow({
   onPlay,
   onRatingChange,
   onRemoveTag,
+  onTagClick,
   onArtistClick,
   onAlbumClick,
   onMouseEnter,
@@ -203,7 +207,7 @@ const TrackRow = memo(function TrackRow({
       {showTagPills && (
         <div className="w-40 min-w-0 flex flex-wrap gap-0.5 overflow-hidden max-h-[30px] items-start">
           {tagNames.slice(0, 6).map((t) => (
-            <TagPill key={t.name} name={t.name} trackId={track.id} colorClass={`pill-color-${t.color ?? 'default'}`} onRemove={onRemoveTag} />
+            <TagPill key={t.name} name={t.name} trackId={track.id} colorClass={`pill-color-${t.color ?? 'default'}`} onRemove={onRemoveTag} onClick={onTagClick} />
           ))}
           {tagNames.length > 6 && (
             <span className="text-[8px] text-themed-muted shrink-0">+{tagNames.length - 6}</span>
@@ -274,6 +278,8 @@ interface VirtualTrackListProps {
   onSortChange?: (field: string) => void;
   showTagPills?: boolean;
   onRemoveTag?: (trackId: string, tagName: string) => void;
+  keyboardNavEnabled?: boolean;
+  onEscape?: () => void;
 }
 
 const EMPTY_TAG_LIST: TagInfo[] = [];
@@ -293,6 +299,8 @@ export function VirtualTrackList({
   onSortChange,
   showTagPills = true,
   onRemoveTag: onRemoveTagProp,
+  keyboardNavEnabled = true,
+  onEscape,
 }: VirtualTrackListProps) {
   const [tracks, setTracks] = useState<FlatSong[]>([]);
   const [tagByTrackId, setTagByTrackId] = useState<Record<string, TagInfo[]>>({});
@@ -313,7 +321,7 @@ export function VirtualTrackList({
   tracksCountRef.current = tracks.length;
 
   const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
-  const { loadArtist, loadAlbum } = useLibraryStore();
+  const { loadArtist, loadAlbum, navigateToPlaylist } = useLibraryStore();
   const showTrackListArt = useSettingsStore((s) => s.showTrackListArt);
   const showContextMenu = useContextMenuStore((s) => s.show);
 
@@ -411,10 +419,21 @@ export function VirtualTrackList({
     [playTrackInContext],
   );
 
+  const handleKbdFocusChange = useCallback(
+    (index: number) => {
+      const song = songsRef.current[index];
+      if (song) useTrackTargetStore.getState().setHoverTarget(song);
+    },
+    [],
+  );
+
   const { focusIndex, getItemProps, handleMouseMove } = useKeyboardNav({
     itemCount: tracks.length,
     onActivate: handlePlay,
     scrollToIndex,
+    enabled: keyboardNavEnabled,
+    onEscape,
+    onFocusChange: handleKbdFocusChange,
   });
 
   useEffect(() => {
@@ -611,6 +630,7 @@ export function VirtualTrackList({
                 onPlay={handlePlay}
                 onRatingChange={handleRatingChange}
                 onRemoveTag={resolvedOnRemoveTag}
+                onTagClick={navigateToPlaylist}
                 onArtistClick={loadArtist}
                 onAlbumClick={loadAlbum}
                 onMouseEnter={() => {

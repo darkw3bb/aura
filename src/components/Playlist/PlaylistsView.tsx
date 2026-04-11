@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/tauri';
 import type { PlaylistSummary } from '../../lib/tauri';
 import { VirtualTrackList } from '../TrackList/VirtualTrackList';
+import { useLibraryStore } from '../../stores/libraryStore';
+import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 
 const PILL_COLORS = [
   { key: 'default', label: 'Default' },
@@ -28,6 +30,12 @@ export function PlaylistsView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [focus, setFocus] = useState<'sidebar' | 'tracks'>('sidebar');
+  const selectedPlaylistName = useLibraryStore((s) => s.selectedPlaylistName);
+  const appliedNameRef = useRef<string | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   const refresh = useCallback(() => {
     api.listCachedPlaylists().then(setPlaylists).catch(() => setPlaylists([]));
@@ -36,6 +44,19 @@ export function PlaylistsView() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!selectedPlaylistName || playlists.length === 0) return;
+    if (appliedNameRef.current === selectedPlaylistName) return;
+    const match = playlists.find(
+      (p) => p.name.toLowerCase() === selectedPlaylistName.toLowerCase(),
+    );
+    if (match) {
+      setSelectedId(match.id);
+      setFocus('tracks');
+      appliedNameRef.current = selectedPlaylistName;
+    }
+  }, [selectedPlaylistName, playlists]);
 
   useEffect(() => {
     const onTags = () => refresh();
@@ -48,11 +69,38 @@ export function PlaylistsView() {
     [playlists, selectedId],
   );
 
+  const handleSidebarActivate = useCallback(
+    (index: number) => {
+      const p = playlists[index];
+      if (p) {
+        setSelectedId(p.id);
+        setConfirmDelete(null);
+        setColorPickerOpen(false);
+        setFocus('tracks');
+      }
+    },
+    [playlists],
+  );
+
+  const handleEscapeToSidebar = useCallback(() => {
+    setFocus('sidebar');
+  }, []);
+
+  const { focusIndex: sidebarFocusIndex, getItemProps: getSidebarItemProps } = useKeyboardNav({
+    itemCount: playlists.length,
+    onActivate: handleSidebarActivate,
+    scrollRef: sidebarRef,
+    enabled: focus === 'sidebar',
+  });
+
   const handleDelete = useCallback(async (id: string) => {
     try {
       await api.deletePlaylist(id);
       setConfirmDelete(null);
-      if (selectedId === id) setSelectedId(null);
+      if (selectedId === id) {
+        setSelectedId(null);
+        setFocus('sidebar');
+      }
       refresh();
       window.dispatchEvent(new Event('aura-tags-changed'));
     } catch (e) {
@@ -73,9 +121,43 @@ export function PlaylistsView() {
     }
   }, []);
 
+  const startRename = useCallback((id: string, currentName: string) => {
+    setEditingName(id);
+    setEditValue(currentName);
+    setConfirmDelete(null);
+    setColorPickerOpen(false);
+  }, []);
+
+  const commitRename = useCallback(async () => {
+    if (!editingName) return;
+    const trimmed = editValue.trim();
+    if (!trimmed) {
+      setEditingName(null);
+      return;
+    }
+    const prev = playlists.find((p) => p.id === editingName);
+    if (prev && prev.name === trimmed) {
+      setEditingName(null);
+      return;
+    }
+    try {
+      await api.renamePlaylist(editingName, trimmed);
+      setPlaylists((prev) =>
+        prev.map((p) => (p.id === editingName ? { ...p, name: trimmed } : p)),
+      );
+      window.dispatchEvent(new Event('aura-tags-changed'));
+    } catch (e) {
+      console.error('rename playlist failed', e);
+    }
+    setEditingName(null);
+  }, [editingName, editValue, playlists]);
+
   return (
     <div className="flex h-full min-h-0">
-      <div className="w-52 shrink-0 border-r border-themed overflow-y-auto bg-themed-secondary flex flex-col">
+      <nav
+        ref={sidebarRef}
+        className="w-52 shrink-0 border-r border-themed overflow-y-auto bg-themed-secondary flex flex-col"
+      >
         <div className="px-3 py-3 border-b border-themed">
           <h2 className="text-[13px] font-semibold text-themed-primary">Playlists</h2>
           <p className="text-[11px] text-themed-muted mt-0.5">Tags from Navidrome</p>
@@ -85,32 +167,67 @@ export function PlaylistsView() {
             No playlists in the local cache yet. Tags sync in the background after you connect, or use Cmd+K to tag a track (creates a playlist on the server).
           </p>
         )}
-        <nav className="flex flex-col gap-0.5 p-2">
-          {playlists.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              data-active={selectedId === p.id}
-              onClick={() => { setSelectedId(p.id); setConfirmDelete(null); setColorPickerOpen(false); }}
-              className="nav-item w-full text-left px-2.5 py-2 rounded-md text-[13px] cursor-pointer truncate flex items-center gap-1.5"
-            >
-              <ColorDot color={p.color ?? 'default'} />
-              <span className="truncate flex-1">
-                {p.name}
-                {p.song_count != null && (
-                  <span className="block text-[10px] text-themed-muted tabular-nums">{p.song_count} tracks</span>
-                )}
-              </span>
-            </button>
-          ))}
-        </nav>
-      </div>
+        <div className="flex flex-col gap-0.5 p-2">
+          {playlists.map((p, i) => {
+            const itemProps = getSidebarItemProps(i);
+            const isKbdFocused = focus === 'sidebar' && sidebarFocusIndex === i;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                data-active={selectedId === p.id}
+                data-kbd-idx={itemProps['data-kbd-idx']}
+                data-focused={itemProps['data-focused']}
+                onClick={() => { setSelectedId(p.id); setConfirmDelete(null); setColorPickerOpen(false); setFocus('tracks'); }}
+                onMouseEnter={itemProps.onMouseEnter}
+                className={`nav-item w-full text-left px-2.5 py-2 rounded-md text-[13px] cursor-pointer truncate flex items-center gap-1.5 ${isKbdFocused ? 'ring-1 ring-themed-accent' : ''}`}
+              >
+                <ColorDot color={p.color ?? 'default'} />
+                <span className="truncate flex-1">
+                  {p.name}
+                  {p.song_count != null && (
+                    <span className="block text-[10px] text-themed-muted tabular-nums">{p.song_count} tracks</span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
       <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
         {selected ? (
           <>
             <div className="px-4 pt-3 pb-2 flex items-center gap-2 border-b border-themed shrink-0">
               <ColorDot color={selected.color ?? 'default'} />
-              <h3 className="text-[15px] font-semibold text-themed-primary truncate flex-1">{selected.name}</h3>
+              {editingName === selected.id ? (
+                <input
+                  autoFocus
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRename();
+                    if (e.key === 'Escape') setEditingName(null);
+                  }}
+                  className="flex-1 min-w-0 text-[15px] font-semibold text-themed-primary bg-themed-tertiary border border-themed rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-themed-accent"
+                />
+              ) : (
+                <h3
+                  className="text-[15px] font-semibold text-themed-primary truncate flex-1 cursor-pointer"
+                  onDoubleClick={() => startRename(selected.id, selected.name)}
+                  title="Double-click to rename"
+                >
+                  {selected.name}
+                </h3>
+              )}
+              <button
+                type="button"
+                onClick={() => startRename(selected.id, selected.name)}
+                className="bg-transparent border border-themed rounded px-2 py-0.5 text-[11px] text-themed-secondary hover:text-themed-primary cursor-pointer"
+                title="Rename playlist"
+              >
+                Rename
+              </button>
               <div className="relative">
                 <button
                   type="button"
@@ -176,12 +293,16 @@ export function PlaylistsView() {
                     No tracks in this playlist (or they are not in your local library cache yet).
                   </div>
                 }
+                keyboardNavEnabled={focus === 'tracks'}
+                onEscape={handleEscapeToSidebar}
               />
             </div>
           </>
         ) : (
           <div className="p-8 text-[13px] text-themed-muted">
-            Select a playlist on the left.
+            {focus === 'sidebar' && playlists.length > 0
+              ? 'Use J/K to navigate playlists, Enter to select.'
+              : 'Select a playlist on the left.'}
           </div>
         )}
       </div>

@@ -280,6 +280,8 @@ export const api = {
     invoke<string>('apply_playlist_tag', { song, tagName }),
   removePlaylistTag: (trackId: string, tagName: string) =>
     invoke<void>('remove_playlist_tag', { trackId, tagName }),
+  renamePlaylist: (playlistId: string, name: string) =>
+    invoke<void>('rename_playlist', { playlistId, name }),
   deletePlaylist: (playlistId: string) =>
     invoke<void>('delete_playlist', { playlistId }),
   setPlaylistColor: (playlistId: string, color: string) =>

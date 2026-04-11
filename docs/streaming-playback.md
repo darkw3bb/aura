@@ -54,16 +54,18 @@ keeps startup latency under a second even for large FLACs.
 A split reader/writer pair connected through `Arc<Mutex<Vec<u8>>>` +
 `Condvar`.
 
-| Type              | Role                                              |
-| ----------------- | ------------------------------------------------- |
-| `StreamingBuffer` | Read side. Implements `Read + Seek + Send + Sync`. Passed to rodio's `Decoder`. |
-| `StreamingWriter` | Write side. Owned by the background download task. |
 
-**`Read::read`** returns data at the current `read_pos` if available.  When
+| Type              | Role                                                                            |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `StreamingBuffer` | Read side. Implements `Read + Seek + Send + Sync`. Passed to rodio's `Decoder`. |
+| `StreamingWriter` | Write side. Owned by the background download task.                              |
+
+
+`**Read::read`** returns data at the current `read_pos` if available.  When
 the decoder catches up to the download, `read` blocks on the condvar until
 more bytes arrive or the stream finishes (returns 0 / EOF).
 
-**`Seek`** supports `SeekFrom::Start` and `SeekFrom::Current` at any time
+`**Seek**` supports `SeekFrom::Start` and `SeekFrom::Current` at any time
 (within already-buffered data the read is instant; beyond it the next `read`
 blocks).  `SeekFrom::End` returns `Unsupported` while the download is still
 in progress so that symphonia's format prober never stalls waiting for the
@@ -99,10 +101,10 @@ The frontend sets `currentTrack` optimistically before the Tauri IPC call
 and protects it from being overwritten by stale polling data:
 
 - `_skipRefreshUntil = Infinity` — blocks `refreshState` from overwriting
-  `currentTrack`, `isPlaying`, and `elapsedSecs`.
+`currentTrack`, `isPlaying`, and `elapsedSecs`.
 - `_playGuard = Date.now()` — each play captures a unique guard value.
-  Only the latest play's completion handler clears the skip window, so
-  rapid track changes never race.
+Only the latest play's completion handler clears the skip window, so
+rapid track changes never race.
 
 `pause`, `resume`, and `stop` use a fixed 2-second skip window since those
 commands complete near-instantly.
@@ -132,9 +134,12 @@ commands complete near-instantly.
 
 ## Trade-offs
 
-| What                         | Behaviour                                        |
-| ---------------------------- | ------------------------------------------------ |
-| Seeking during early playback | Blocks until the target position has been downloaded. Seeking within the already-buffered portion is instant. |
-| Slow network                 | If the decoder outruns the download, the audio thread blocks briefly, causing a short stutter rather than a crash. |
-| Duration                     | The UI gets duration from the Subsonic track metadata (`track.duration`), not from the stream, so it is always available immediately. |
-| Memory                       | The full file accumulates in the `Vec<u8>`, same as before. A ring buffer could reduce peak memory but is not needed today. |
+
+| What                          | Behaviour                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Seeking during early playback | Blocks until the target position has been downloaded. Seeking within the already-buffered portion is instant.                         |
+| Slow network                  | If the decoder outruns the download, the audio thread blocks briefly, causing a short stutter rather than a crash.                    |
+| Duration                      | The UI gets duration from the Subsonic track metadata (`track.duration`), not from the stream, so it is always available immediately. |
+| Memory                        | The full file accumulates in the `Vec<u8>`, same as before. A ring buffer could reduce peak memory but is not needed today.           |
+
+
