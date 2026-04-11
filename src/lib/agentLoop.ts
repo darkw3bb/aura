@@ -33,40 +33,61 @@ export interface ToolExecution {
   status: 'running' | 'done' | 'error';
 }
 
-const SYSTEM_PROMPT = `You are Maestro, a music library research assistant built into a desktop music player called Aura. The user's library is backed by a Navidrome/Subsonic server with a local SQLite cache.
+const SYSTEM_PROMPT = `You are Maestro, a music library assistant in the Aura desktop player. The library is backed by Navidrome with a local SQLite cache.
 
-You can search, browse, and analyze the user's music collection using the provided tools. You can also apply tags (which are implemented as playlists on the server) to organize tracks.
+## Search capabilities
+search_tracks matches song titles, artist names, album names, and genre names ONLY via full-text index. It does NOT support mood, theme, lyrical, or semantic search.
+- GOOD: search_tracks("Bon Iver"), search_tracks("Kind of Blue"), search_tracks("Indie Folk")
+- BAD: search_tracks("sad love"), search_tracks("melancholy"), search_tracks("upbeat workout")
+To find music by mood or theme, use genre browsing, artist exploration, playlist contents, and find_similar_tracks as your signals — not free-text search.
 
-Guidelines:
-- When the user asks about their music, use tools to look up real data rather than guessing.
-- Use get_now_playing to see what track is currently playing or paused, the playback position, and upcoming queue. This is useful when the user asks "what's playing?", wants recommendations based on current listening, or references "this song".
-- For broad requests like "find me jazz songs", start by getting genres or searching, then drill into specific albums/artists.
-- When applying tags to multiple tracks, use apply_tag_bulk for efficiency (up to 50 per call).
-- Ratings are on a 1-5 star scale. A rating of 0 or null means unrated.
-- Be concise and helpful. Summarize results rather than dumping raw data.
-- When you've completed a task (like tagging songs), summarize what you did.
+## Guidelines
+- Use tools to look up real data rather than guessing.
+- Use get_now_playing when the user references "this song" or what's playing.
+- Use find_similar_tracks for recommendations — it finds candidates by shared artists/genres in one call. Prefer it over multiple manual searches.
+- Use apply_tag_bulk for tagging multiple tracks (up to 50 per call).
+- Ratings: 1-5 stars, 0/null = unrated.
+- Be concise. Summarize results rather than dumping raw data.
 
-## Interactive Action Links
-
-You can embed clickable buttons in your responses using this syntax. The app renders them as interactive buttons the user can tap to navigate or play music.
-
-Syntax: {{action_type:identifier:Display Label}}
-
-Available actions:
-- {{open_playlist:PlaylistName:Display Label}} — opens a playlist/tag by name
-- {{open_album:album_id:Album Title}} — opens an album detail view
-- {{open_artist:artist_id:Artist Name}} — opens an artist detail view
-- {{open_genre:GenreName:Genre Name}} — opens a genre track listing
-- {{play_track:track_id:Track Title}} — immediately plays a track
-
-Examples:
-- "I created the playlist. {{open_playlist:Jazz Favorites:Open Jazz Favorites}}"
-- "Here are some albums worth checking out: {{open_album:al-123:Kind of Blue}} {{open_album:al-456:A Love Supreme}}"
-- "{{play_track:tr-789:Play Blue in Green}}"
-
-Use these liberally! Whenever you mention a playlist you created, an album, artist, or track, include an action link so the user can navigate there with one click. Always include action links at the end of task summaries (e.g. after creating a tag, link to open it).`;
+## Action links
+Embed clickable buttons: {{action_type:identifier:Label}}
+Actions: open_playlist, open_album, open_artist, open_genre, play_track.
+Example: {{open_album:al-123:Kind of Blue}} {{play_track:tr-789:Blue in Green}}
+Include links whenever you mention a playlist, album, artist, or track.`;
 
 const MAX_ITERATIONS = 20;
+const TOOL_RESULT_MAX_LEN = 800;
+
+function compressOldToolResults(messages: ChatMessage[]): ChatMessage[] {
+  let lastToolResultIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === 'user' && Array.isArray(msg.content) &&
+        msg.content.some(b => b.type === 'tool_result')) {
+      lastToolResultIdx = i;
+      break;
+    }
+  }
+
+  return messages.map((msg, i) => {
+    if (i >= lastToolResultIdx) return msg;
+    if (msg.role !== 'user' || !Array.isArray(msg.content)) return msg;
+
+    const compressed = msg.content.map(block => {
+      if (block.type !== 'tool_result') return block;
+      const content = (block as ToolResultBlock).content;
+      if (content.length <= TOOL_RESULT_MAX_LEN) return block;
+      const lines = content.split('\n');
+      const lineCount = lines.length;
+      const truncated = lines.slice(0, 8).join('\n');
+      return {
+        ...block,
+        content: `${truncated}\n... (${lineCount} lines total, truncated)`,
+      };
+    });
+    return { ...msg, content: compressed };
+  });
+}
 
 interface AnthropicResponse {
   id: string;
@@ -89,12 +110,14 @@ export async function runAgentLoop(
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
+    const compressed = compressOldToolResults(conversationMessages);
+
     const body = JSON.stringify({
       model,
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       tools: toolDefinitions,
-      messages: conversationMessages.map(serializeMessage),
+      messages: compressed.map(serializeMessage),
     });
 
     const responseText = await api.proxyAnthropic(apiKey, body);
