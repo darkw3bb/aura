@@ -48,11 +48,24 @@ Your music. Your server. A proper desktop app with a point of view about how mus
 - **Album-first navigation** — Albums, Artists, and Years are the primary ways to explore your library
 - **Years view** — browse your entire collection grouped by release year, newest first
 - **Recently Played** — the Albums landing page keeps you close to what you've been listening to
-- **Artist pages** — album-grouped tracks with per-album ratings and Play All
+- **Artist pages** — album-grouped tracks with per-album ratings and Play All; click any album name or cover art to jump to its detail page
 - **3D tilt hover** — Apple TV-style pointer-tracking tilt, shine, and parallax on album cards
 - **Star ratings** — rate tracks and albums 1–5 stars, synced back to your server
 - **Genre browsing** — explore your library by genre
 - **Queue management** — drag-and-drop reordering, play next, add to queue, previously-played history
+
+### Playlists as tags
+
+Aura treats playlists like tags. A track can belong to many playlists at once, and a playlist is just a view of every track that carries that tag. This is different from traditional playlist managers where a track lives in one ordered list — here the focus is on **categorization and discovery**.
+
+- **Tag any track** — open the command palette (Cmd/Ctrl+K, type `tag`) and assign one or more playlist tags to a track; if the playlist doesn't exist yet, it's created on your server automatically
+- **Tag pills on every track row** — small color-coded pills appear inline next to each track showing which playlists it belongs to
+- **Click a pill to navigate** — clicking a tag pill jumps straight to that playlist's track list
+- **Remove tags** — hover any tag pill to reveal an ×, click to untag the track
+- **Playlists view** — a dedicated sidebar lists all playlists with J/K keyboard navigation; press Enter to select and browse tracks, Escape to return to the sidebar
+- **Rename and delete** — rename playlists inline (double-click or Rename button) and delete with confirmation; changes sync to your Navidrome server
+- **Per-playlist colors** — pick from 8 accent-derived color shades so each playlist is visually distinct; colors automatically adapt when you switch themes
+- **Searchable playlists** — playlists appear as results in the Cmd/Ctrl+K command palette alongside artists, albums, and songs
 
 ### Speed and efficiency
 
@@ -71,7 +84,7 @@ Your music. Your server. A proper desktop app with a point of view about how mus
 
 ### Personalization
 
-- **7 built-in themes** — Midnight, Nord, Catppuccin, Aura Light, Winamp, Matrix, iTunes Classic
+- **15 built-in themes** — Midnight, Nord, Catppuccin, Aura Light, Winamp, Matrix, iTunes Classic, Cyberdeck, Phosphor, Vaporwave, Bloodmoon, Espresso, Sahara, Y2K, Cybertruck
 - **Track list album art** — optional cover art thumbnails in track rows, togglable in Settings
 
 ---
@@ -209,7 +222,7 @@ src/                 React + TypeScript frontend
     UpdateBanner.tsx In-app update prompt
   stores/            Zustand state (library, player, settings, theme, context menu)
   hooks/             useSearch, useUpdater, useKeyboardNav, useTiltHover
-  themes/            7 color themes (midnight, nord, catppuccin, aura-light, etc.)
+  themes/            15 color themes (midnight, nord, catppuccin, aura-light, etc.)
   lib/               Typed Tauri IPC wrappers
 ```
 
@@ -229,7 +242,8 @@ src/                 React + TypeScript frontend
 - [ ] Smart playlists
 - [ ] ReplayGain volume normalization
 - [ ] Crossfade
-- [x] Theme system (7 themes)
+- [x] Playlists / tag system (tracks belong to multiple playlists)
+- [x] Theme system (15 themes)
 - [x] Years view (browse by release year)
 - [x] Background library sync
 - [x] Cover art disk cache

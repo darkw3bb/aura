@@ -63,10 +63,10 @@ snake_case forms are identical.
 - All affected fields are `Option<T>` / `T | undefined`, so no crashes occurred.
 - Single-word fields covered the most visible data (titles, artist names, etc.).
 - `user_rating` being silently undefined meant stars always showed 0 — but the
-  UI still rendered, just with empty stars.
+UI still rendered, just with empty stars.
 - `bit_rate`, `cover_art`, `content_type`, `disc_number` being undefined caused
-  subtle missing-data issues (no bitrate display, missing cover art on some
-  paths, no format pill info).
+subtle missing-data issues (no bitrate display, missing cover art on some
+paths, no format pill info).
 
 ### Why the Rated Tracks view worked
 
@@ -108,18 +108,22 @@ pub struct Song {
 
 ### How `alias` differs from `rename_all`
 
-| Aspect | `rename_all = "camelCase"` | `alias = "camelCaseName"` |
-| --- | --- | --- |
-| **Serialization** | Outputs camelCase | No effect — outputs the Rust field name (snake_case) |
-| **Deserialization** | Accepts **only** camelCase | Accepts **both** the Rust field name and the alias |
+
+| Aspect              | `rename_all = "camelCase"` | `alias = "camelCaseName"`                            |
+| ------------------- | -------------------------- | ---------------------------------------------------- |
+| **Serialization**   | Outputs camelCase          | No effect — outputs the Rust field name (snake_case) |
+| **Deserialization** | Accepts **only** camelCase | Accepts **both** the Rust field name and the alias   |
+
 
 This gives us the best of both worlds:
 
-| Direction | Key format | Works? |
-| --- | --- | --- |
-| Subsonic API → Rust | camelCase (`bitRate`) | Accepted via alias |
-| Rust → Frontend (Tauri IPC) | snake_case (`bit_rate`) | Matches TS interfaces |
+
+| Direction                          | Key format              | Works?                   |
+| ---------------------------------- | ----------------------- | ------------------------ |
+| Subsonic API → Rust                | camelCase (`bitRate`)   | Accepted via alias       |
+| Rust → Frontend (Tauri IPC)        | snake_case (`bit_rate`) | Matches TS interfaces    |
 | Frontend → Rust (play_track, etc.) | snake_case (`bit_rate`) | Accepted as primary name |
+
 
 ---
 
@@ -127,27 +131,26 @@ This gives us the best of both worlds:
 
 All in `src-tauri/src/subsonic/models.rs`:
 
-| Struct | Fields that gained aliases |
-| --- | --- |
-| `Song` | `album_id`, `artist_id`, `content_type`, `bit_rate`, `cover_art`, `user_rating`, `disc_number` |
-| `Album` | `artist_id`, `cover_art`, `song_count` |
-| `AlbumDetail` | `artist_id`, `cover_art`, `song_count` |
-| `Artist` | `album_count`, `cover_art`, `artist_image_url` |
-| `ArtistDetail` | `album_count`, `cover_art` |
+
+| Struct         | Fields that gained aliases                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| `Song`         | `album_id`, `artist_id`, `content_type`, `bit_rate`, `cover_art`, `user_rating`, `disc_number` |
+| `Album`        | `artist_id`, `cover_art`, `song_count`                                                         |
+| `AlbumDetail`  | `artist_id`, `cover_art`, `song_count`                                                         |
+| `Artist`       | `album_count`, `cover_art`, `artist_image_url`                                                 |
+| `ArtistDetail` | `album_count`, `cover_art`                                                                     |
+
 
 ### Structs intentionally left unchanged
 
-- **`PlaybackState`** (`src-tauri/src/commands.rs`) — keeps `rename_all =
-  "camelCase"` because its TypeScript interface already uses camelCase
-  (`isPlaying`, `currentTrack`, `elapsedSecs`, `durationSecs`).
-
+- `**PlaybackState`** (`src-tauri/src/commands.rs`) — keeps `rename_all = "camelCase"` because its TypeScript interface already uses camelCase
+(`isPlaying`, `currentTrack`, `elapsedSecs`, `durationSecs`).
 - **API wrapper structs** (`SubsonicEnvelope`, `AlbumBody`, `AlbumListBody`,
-  `SearchBody`, etc.) — keep `rename_all = "camelCase"` because they are only
-  used for deserializing Subsonic API responses and are never sent to the
-  frontend.
-
+`SearchBody`, etc.) — keep `rename_all = "camelCase"` because they are only
+used for deserializing Subsonic API responses and are never sent to the
+frontend.
 - **Flat structs** (`FlatSong`, `FlatAlbum`, `FlatArtist`) — already had no
-  `rename_all` and were serializing correctly as snake_case.
+`rename_all` and were serializing correctly as snake_case.
 
 ---
 
@@ -156,17 +159,18 @@ All in `src-tauri/src/subsonic/models.rs`:
 With `Song` and related structs now serializing as snake_case, every view that
 consumes API data (not just cache data) gets the full set of fields:
 
-- **`bit_rate`** — kbps column now renders in Album Detail and Artist Detail
-  (previously only worked in Rated Tracks via the cache)
-- **`artist_id`** — clickable artist links in Album Detail and Artist Detail
-  track rows now navigate correctly (previously fell through to plain text)
-- **`cover_art`** — cover art resolves for API-sourced tracks in the player bar
-- **`user_rating`** — star ratings from the API reflect actual server values
-  (previously always showed 0)
-- **`content_type`** — FormatPill in the player bar can now determine the audio
-  format for API-sourced tracks
-- **`disc_number`** — disc grouping metadata is now available
+- `**bit_rate`** — kbps column now renders in Album Detail and Artist Detail
+(previously only worked in Rated Tracks via the cache)
+- `**artist_id**` — clickable artist links in Album Detail and Artist Detail
+track rows now navigate correctly (previously fell through to plain text)
+- `**cover_art**` — cover art resolves for API-sourced tracks in the player bar
+- `**user_rating**` — star ratings from the API reflect actual server values
+(previously always showed 0)
+- `**content_type**` — FormatPill in the player bar can now determine the audio
+format for API-sourced tracks
+- `**disc_number**` — disc grouping metadata is now available
 - **Frontend → Backend round-trip** — when the frontend sends `Song` objects
-  back to the backend (e.g., `play_track_in_context`), multi-word fields are
-  now correctly deserialized because the primary name is snake_case (matching
-  what the frontend sends)
+back to the backend (e.g., `play_track_in_context`), multi-word fields are
+now correctly deserialized because the primary name is snake_case (matching
+what the frontend sends)
+

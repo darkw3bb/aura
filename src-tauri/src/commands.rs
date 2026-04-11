@@ -991,6 +991,25 @@ pub async fn set_playlist_color(
 }
 
 #[tauri::command]
+pub async fn rename_playlist(
+    state: tauri::State<'_, Arc<AppState>>,
+    playlist_id: String,
+    name: String,
+) -> Result<(), String> {
+    let trimmed = name.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("Name cannot be empty".to_string());
+    }
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    client.rename_playlist(&playlist_id, &trimmed).await?;
+
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.rename_playlist(&playlist_id, &trimmed)?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn delete_playlist(
     state: tauri::State<'_, Arc<AppState>>,
     playlist_id: String,

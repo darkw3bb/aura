@@ -79,11 +79,11 @@ function getAccentColor() {
 }
 
 export function StatsView() {
-  const [period, setPeriod] = useState<Period>('all');
+  const [period, setPeriod] = useState<Period>('week');
   const [stats, setStats] = useState<StatsData | null>(
-    statsCache.get('all') ?? null,
+    statsCache.get('week') ?? null,
   );
-  const [loading, setLoading] = useState(!statsCache.has('all'));
+  const [loading, setLoading] = useState(!statsCache.has('week'));
   const { loadAlbum, loadArtist, saveScrollTop } = useLibraryStore();
 
   useEffect(() => {

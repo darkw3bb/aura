@@ -19,7 +19,7 @@ function formatDuration(secs?: number): string {
 }
 
 export function AlbumDetail() {
-  const { selectedAlbum, loadArtist, updateAlbumRating } = useLibraryStore();
+  const { selectedAlbum, loadArtist, updateAlbumRating, navigateToPlaylist } = useLibraryStore();
   const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
   const showContextMenu = useContextMenuStore((s) => s.show);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -42,19 +42,20 @@ export function AlbumDetail() {
     [songs, playTrackInContext],
   );
 
-  const { focusIndex, getItemProps, handleMouseMove } = useKeyboardNav({
+  const handleKbdFocusChange = useCallback(
+    (index: number) => {
+      const song = songs[index] ?? null;
+      useTrackTargetStore.getState().setHoverTarget(song);
+    },
+    [songs],
+  );
+
+  const { getItemProps, handleMouseMove } = useKeyboardNav({
     itemCount: songs.length,
     onActivate,
     scrollRef,
+    onFocusChange: handleKbdFocusChange,
   });
-
-  useEffect(() => {
-    const song = focusIndex >= 0 ? songs[focusIndex] ?? null : null;
-    useTrackTargetStore.getState().setKeyboardTarget(song);
-    return () => {
-      useTrackTargetStore.getState().setKeyboardTarget(null);
-    };
-  }, [focusIndex, songs]);
 
   useEffect(() => {
     if (songs.length === 0) {
@@ -229,9 +230,9 @@ export function AlbumDetail() {
               )}
             </div>
             {tags.length > 0 && (
-              <div className="w-36 shrink-0 flex flex-wrap gap-0.5 overflow-hidden max-h-[34px] items-start">
+              <div className="w-44 shrink-0 flex flex-nowrap gap-0.5 overflow-hidden items-center">
                 {tags.slice(0, 6).map((t) => (
-                  <TagPill key={t.name} name={t.name} trackId={song.id} colorClass={`pill-color-${t.color ?? 'default'}`} onRemove={handleRemoveTag} />
+                  <TagPill key={t.name} name={t.name} trackId={song.id} colorClass={`pill-color-${t.color ?? 'default'}`} onRemove={handleRemoveTag} onClick={navigateToPlaylist} />
                 ))}
                 {tags.length > 6 && (
                   <span className="text-[8px] text-themed-muted shrink-0">+{tags.length - 6}</span>

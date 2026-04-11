@@ -5,6 +5,9 @@ interface UseKeyboardNavOptions {
   onActivate: (index: number) => void;
   scrollRef?: RefObject<HTMLElement | null>;
   scrollToIndex?: (index: number) => void;
+  enabled?: boolean;
+  onEscape?: () => void;
+  onFocusChange?: (index: number) => void;
 }
 
 interface UseKeyboardNavReturn {
@@ -24,6 +27,9 @@ export function useKeyboardNav({
   onActivate,
   scrollRef,
   scrollToIndex,
+  enabled = true,
+  onEscape,
+  onFocusChange,
 }: UseKeyboardNavOptions): UseKeyboardNavReturn {
   const [focusIndex, setFocusIndex] = useState(-1);
   const keyboardNavRef = useRef(false);
@@ -45,25 +51,49 @@ export function useKeyboardNav({
     }
   }, [focusIndex, scrollRef, scrollToIndex]);
 
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const onEscapeRef = useRef(onEscape);
+  onEscapeRef.current = onEscape;
+  const onFocusChangeRef = useRef(onFocusChange);
+  onFocusChangeRef.current = onFocusChange;
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!enabledRef.current) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
         return;
       }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === 'Escape' && onEscapeRef.current) {
+        e.preventDefault();
+        onEscapeRef.current();
+        return;
+      }
+
       if (itemCount === 0) return;
 
       switch (e.key) {
         case 'j': {
           e.preventDefault();
           keyboardNavRef.current = true;
-          setFocusIndex((i) => (i < 0 ? 0 : Math.min(i + 1, itemCount - 1)));
+          setFocusIndex((i) => {
+            const next = i < 0 ? 0 : Math.min(i + 1, itemCount - 1);
+            onFocusChangeRef.current?.(next);
+            return next;
+          });
           break;
         }
         case 'k': {
           e.preventDefault();
           keyboardNavRef.current = true;
-          setFocusIndex((i) => (i < 0 ? 0 : Math.max(i - 1, 0)));
+          setFocusIndex((i) => {
+            const next = i < 0 ? 0 : Math.max(i - 1, 0);
+            onFocusChangeRef.current?.(next);
+            return next;
+          });
           break;
         }
         case 'Enter': {

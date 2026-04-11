@@ -3,6 +3,8 @@ import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { useContextMenuStore } from '../../stores/contextMenuStore';
 import { useKeyboardNav } from '../../hooks/useKeyboardNav';
+import { useTrackTargetStore } from '../../stores/trackTargetStore';
+import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
@@ -28,10 +30,18 @@ export function ArtistDetail() {
     [allSongs, playTrackInContext],
   );
 
+  const handleKbdFocusChange = useCallback(
+    (index: number) => {
+      if (allSongs[index]) useTrackTargetStore.getState().setHoverTarget(allSongs[index]);
+    },
+    [allSongs],
+  );
+
   const { getItemProps, handleMouseMove } = useKeyboardNav({
     itemCount: allSongs.length,
     onActivate,
     scrollRef,
+    onFocusChange: handleKbdFocusChange,
   });
 
   const handleAlbumRating = async (albumId: string, rating: number) => {
@@ -85,6 +95,10 @@ export function ArtistDetail() {
                 showContextMenu(e.clientX, e.clientY, [
                   { label: 'Play Next', onClick: () => insertNextInQueue(song) },
                   { label: 'Add to Queue', onClick: () => addToQueue(song) },
+                  {
+                    label: 'Tag…',
+                    onClick: () => useCommandPaletteStore.getState().openPaletteTagStep(song),
+                  },
                 ]);
               }}
             />
@@ -113,23 +127,28 @@ function AlbumSection({
   onContextMenu: (song: Song, e: React.MouseEvent) => void;
 }) {
   const { currentTrack, isPlaying } = usePlayerStore();
-  const { loadArtist } = useLibraryStore();
+  const { loadArtist, loadAlbum } = useLibraryStore();
   const songs = album.song ?? [];
 
   return (
     <div>
       <div className="flex gap-4 mb-3">
-        <CoverArt
-          coverArt={album.cover_art}
-          artist={album.artist}
-          albumName={album.name}
-          size={300}
-          className="w-20 h-20 rounded-md shrink-0"
-        />
+        <div className="shrink-0 cursor-pointer" onClick={() => loadAlbum(album.id)}>
+          <CoverArt
+            coverArt={album.cover_art}
+            artist={album.artist}
+            albumName={album.name}
+            size={300}
+            className="w-20 h-20 rounded-md"
+          />
+        </div>
         <div className="flex flex-col justify-end min-w-0">
-          <p className="text-[14px] font-semibold truncate text-themed-primary">
+          <button
+            onClick={() => loadAlbum(album.id)}
+            className="text-[14px] font-semibold truncate text-themed-primary bg-transparent border-0 p-0 cursor-pointer text-left hover:underline"
+          >
             {album.name}
-          </p>
+          </button>
           <p className="text-xs text-themed-muted">
             {album.year && `${album.year} \u00b7 `}
             {songs.length} track{songs.length !== 1 ? 's' : ''}
@@ -146,13 +165,19 @@ function AlbumSection({
       </div>
 
       <div className="rounded-lg overflow-hidden bg-themed-secondary">
-        {songs.map((song, i) => (
+        {songs.map((song, i) => {
+          const itemProps = getItemProps(flatOffset + i);
+          return (
           <div
             key={song.id}
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => onPlayTrack(songs, i)}
             onContextMenu={(e) => onContextMenu(song, e)}
-            {...getItemProps(flatOffset + i)}
+            {...itemProps}
+            onMouseEnter={() => {
+              itemProps.onMouseEnter();
+              useTrackTargetStore.getState().setHoverTarget(song);
+            }}
           >
             <span className="w-8 flex items-center justify-end text-[11px] tabular-nums text-themed-muted">
               {currentTrack?.id === song.id ? (
@@ -190,7 +215,8 @@ function AlbumSection({
               {formatDuration(song.duration)}
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

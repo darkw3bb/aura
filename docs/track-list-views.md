@@ -10,12 +10,12 @@ modal overlay toggled by `searchOpen` state in `App.tsx`.
 ## View quick reference
 
 
-| View              | Component                   | Opened via              | Columns / fields                       | Key behaviour                                    |
-| ----------------- | --------------------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
-| **Rated**         | `TrackList/RatedTracks.tsx` | Sidebar "Rated"         | #, Title, Artist, Album, kbps, Rating, Time  | Virtualised infinite scroll; inline star editing |
-| **Album Detail**  | `Library/AlbumDetail.tsx`   | Click any album         | #, Title, (feat. artist), kbps, Rating, Time | Album header with cover art; Play All button     |
+| View              | Component                   | Opened via              | Columns / fields                                | Key behaviour                                    |
+| ----------------- | --------------------------- | ----------------------- | ----------------------------------------------- | ------------------------------------------------ |
+| **Rated**         | `TrackList/RatedTracks.tsx` | Sidebar "Rated"         | #, Title, Artist, Album, kbps, Rating, Time     | Virtualised infinite scroll; inline star editing |
+| **Album Detail**  | `Library/AlbumDetail.tsx`   | Click any album         | #, Title, (feat. artist), kbps, Rating, Time    | Album header with cover art; Play All button     |
 | **Artist Detail** | `Library/ArtistDetail.tsx`  | Click any artist        | Per album: #, Title, Artist, kbps, Rating, Time | Tracks grouped by album; Play All across albums  |
-| **Search**        | `Search/SearchOverlay.tsx`  | Sidebar "Search" / `⌘K` | Cover art, Title, Artist · Album, Time | Overlay with debounced search; single-click play |
+| **Search**        | `Search/SearchOverlay.tsx`  | Sidebar "Search" / `⌘K` | Cover art, Title, Artist · Album, Time          | Overlay with debounced search; single-click play |
 
 
 ---
@@ -127,14 +127,15 @@ Tracks are **grouped by album**. Each section contains:
 ### Track rows (per album section)
 
 
-| Element    | Content                                                               |
-| ---------- | --------------------------------------------------------------------- |
-| **#**      | Track number from metadata (or list index); EQ bars when playing      |
-| **Title**  | Track title — accent-coloured when currently playing                  |
+| Element    | Content                                                                |
+| ---------- | ---------------------------------------------------------------------- |
+| **#**      | Track number from metadata (or list index); EQ bars when playing       |
+| **Title**  | Track title — accent-coloured when currently playing                   |
 | **Artist** | Clickable link that navigates to Artist Detail (useful for feat. acts) |
-| **kbps**   | Bitrate displayed as e.g. "320k"; empty when not available            |
-| **Rating** | Interactive `StarRating`                                              |
-| **Time**   | Duration formatted as `m:ss`                                          |
+| **kbps**   | Bitrate displayed as e.g. "320k"; empty when not available             |
+| **Rating** | Interactive `StarRating`                                               |
+| **Time**   | Duration formatted as `m:ss`                                           |
+
 
 ### Behaviour
 
@@ -211,4 +212,3 @@ provides a consistent hover background.
 - **Playback context** — `playTrackInContext(songs, index)` sets the full passed
 array as the playback queue. Search is the only view that uses `playTrack`
 (single track, no queue).
-

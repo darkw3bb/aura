@@ -281,35 +281,35 @@
     color: var(--text-secondary);
   }
   .pill-color-red {
-    background: color-mix(in srgb, hsl(0 70% 60%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(0 70% 60%) 70%, var(--text-primary));
+    background: var(--pill-red-bg, var(--bg-tertiary));
+    color: var(--pill-red-text, var(--text-secondary));
   }
   .pill-color-orange {
-    background: color-mix(in srgb, hsl(25 80% 55%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(25 80% 55%) 70%, var(--text-primary));
+    background: var(--pill-orange-bg, var(--bg-tertiary));
+    color: var(--pill-orange-text, var(--text-secondary));
   }
   .pill-color-yellow {
-    background: color-mix(in srgb, hsl(45 80% 50%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(45 80% 50%) 70%, var(--text-primary));
+    background: var(--pill-yellow-bg, var(--bg-tertiary));
+    color: var(--pill-yellow-text, var(--text-secondary));
   }
   .pill-color-green {
-    background: color-mix(in srgb, hsl(145 60% 45%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(145 60% 45%) 70%, var(--text-primary));
+    background: var(--pill-green-bg, var(--bg-tertiary));
+    color: var(--pill-green-text, var(--text-secondary));
   }
   .pill-color-blue {
-    background: color-mix(in srgb, hsl(210 70% 55%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(210 70% 55%) 70%, var(--text-primary));
+    background: var(--pill-blue-bg, var(--bg-tertiary));
+    color: var(--pill-blue-text, var(--text-secondary));
   }
   .pill-color-purple {
-    background: color-mix(in srgb, hsl(270 60% 60%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(270 60% 60%) 70%, var(--text-primary));
+    background: var(--pill-purple-bg, var(--bg-tertiary));
+    color: var(--pill-purple-text, var(--text-secondary));
   }
   .pill-color-pink {
-    background: color-mix(in srgb, hsl(330 70% 60%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(330 70% 60%) 70%, var(--text-primary));
+    background: var(--pill-pink-bg, var(--bg-tertiary));
+    color: var(--pill-pink-text, var(--text-secondary));
   }
   .pill-color-teal {
-    background: color-mix(in srgb, hsl(180 55% 45%) 25%, var(--bg-tertiary));
-    color: color-mix(in srgb, hsl(180 55% 45%) 70%, var(--text-primary));
+    background: var(--pill-teal-bg, var(--bg-tertiary));
+    color: var(--pill-teal-text, var(--text-secondary));
   }
 }

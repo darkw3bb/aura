@@ -23,6 +23,7 @@ interface NavEntry {
   selectedArtist: ArtistDetail | null;
   artistAlbums: AlbumDetail[];
   selectedGenre: string | null;
+  selectedPlaylistName: string | null;
   scrollTop: number;
 }
 
@@ -36,6 +37,7 @@ interface LibraryStore {
   selectedArtist: ArtistDetail | null;
   artistAlbums: AlbumDetail[];
   selectedGenre: string | null;
+  selectedPlaylistName: string | null;
   syncing: boolean;
   syncMessage: string;
   error: string | null;
@@ -46,6 +48,7 @@ interface LibraryStore {
   canGoForward: boolean;
 
   setView: (view: View) => void;
+  navigateToPlaylist: (name: string) => void;
   connect: (url: string, username: string, password: string) => Promise<void>;
   loadArtists: () => Promise<void>;
   loadAlbums: (type?: string) => Promise<void>;
@@ -66,6 +69,7 @@ const initialNavEntry: NavEntry = {
   selectedArtist: null,
   artistAlbums: [],
   selectedGenre: null,
+  selectedPlaylistName: null,
   scrollTop: 0,
 };
 
@@ -92,6 +96,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   selectedArtist: null,
   artistAlbums: [],
   selectedGenre: null,
+  selectedPlaylistName: null,
   syncing: false,
   syncMessage: '',
   error: null,
@@ -102,7 +107,12 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   canGoForward: false,
 
   setView: (view) => {
-    const entry: NavEntry = { view, selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
+    const entry: NavEntry = { view, selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null, selectedPlaylistName: null, scrollTop: 0 };
+    set((s) => pushNav(s, entry));
+  },
+
+  navigateToPlaylist: (name) => {
+    const entry: NavEntry = { view: 'playlists', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null, selectedPlaylistName: name, scrollTop: 0 };
     set((s) => pushNav(s, entry));
   },
 
@@ -113,7 +123,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
       localStorage.setItem('ae_server_url', url);
       localStorage.setItem('ae_username', username);
       localStorage.setItem('ae_password', password);
-      const entry: NavEntry = { view: 'albums', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
+      const entry: NavEntry = { view: 'albums', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: null, selectedPlaylistName: null, scrollTop: 0 };
       set({
         connected: true,
         serverUrl: url,
@@ -153,7 +163,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   loadAlbum: async (id: string) => {
     try {
       const album = await api.getAlbum(id);
-      const entry: NavEntry = { view: 'album-detail', selectedAlbum: album, selectedArtist: null, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
+      const entry: NavEntry = { view: 'album-detail', selectedAlbum: album, selectedArtist: null, artistAlbums: [], selectedGenre: null, selectedPlaylistName: null, scrollTop: 0 };
       set((s) => pushNav(s, entry));
     } catch (e) {
       console.error('Load album error:', e);
@@ -163,7 +173,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   loadArtist: async (id: string) => {
     try {
       const artist = await api.getArtist(id);
-      const entry: NavEntry = { view: 'artist-detail', selectedAlbum: null, selectedArtist: artist, artistAlbums: [], selectedGenre: null, scrollTop: 0 };
+      const entry: NavEntry = { view: 'artist-detail', selectedAlbum: null, selectedArtist: artist, artistAlbums: [], selectedGenre: null, selectedPlaylistName: null, scrollTop: 0 };
       set((s) => pushNav(s, entry));
       const albumDetails = await Promise.all(
         (artist.album ?? []).map((a) => api.getAlbum(a.id))
@@ -179,7 +189,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
   },
 
   loadGenre: (genre: string) => {
-    const entry: NavEntry = { view: 'genre-detail', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: genre, scrollTop: 0 };
+    const entry: NavEntry = { view: 'genre-detail', selectedAlbum: null, selectedArtist: null, artistAlbums: [], selectedGenre: genre, selectedPlaylistName: null, scrollTop: 0 };
     set((s) => pushNav(s, entry));
   },
 
