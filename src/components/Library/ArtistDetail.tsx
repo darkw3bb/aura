@@ -120,7 +120,7 @@ function AlbumSection({
 }: {
   album: AlbumDetail;
   flatOffset: number;
-  getItemProps: (index: number) => Record<string, unknown>;
+  getItemProps: (index: number) => { 'data-kbd-idx': number; 'data-focused': boolean; onMouseEnter: () => void };
   onPlayTrack: (songs: Song[], index: number) => void;
   onRate: (trackId: string, rating: number) => void;
   onAlbumRate: (rating: number) => void;
@@ -166,16 +166,17 @@ function AlbumSection({
 
       <div className="rounded-lg overflow-hidden bg-themed-secondary">
         {songs.map((song, i) => {
-          const itemProps = getItemProps(flatOffset + i);
+          const kbdProps = getItemProps(flatOffset + i);
           return (
           <div
             key={song.id}
             className="track-row flex items-center gap-3 px-4 py-2 cursor-pointer group"
             onDoubleClick={() => onPlayTrack(songs, i)}
             onContextMenu={(e) => onContextMenu(song, e)}
-            {...itemProps}
+            data-kbd-idx={kbdProps['data-kbd-idx']}
+            data-focused={kbdProps['data-focused']}
             onMouseEnter={() => {
-              itemProps.onMouseEnter();
+              kbdProps.onMouseEnter();
               useTrackTargetStore.getState().setHoverTarget(song);
             }}
           >
