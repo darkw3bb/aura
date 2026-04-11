@@ -572,28 +572,25 @@ export function MaestroPanel() {
   );
 }
 
-export function MaestroFAB() {
-  const { toggle, isLoading } = useAgentChatStore();
-  const { anthropicApiKey } = useSettingsStore();
+export function MaestroToggle() {
+  const { toggle, isOpen, isLoading } = useAgentChatStore();
 
   return (
     <button
       onClick={toggle}
-      className="fixed bottom-20 right-4 z-40 w-11 h-11 rounded-full bg-themed-accent text-white shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+      className={`relative p-1.5 rounded-md cursor-pointer transition-colors ${
+        isOpen
+          ? 'bg-themed-accent/15 text-themed-accent'
+          : 'text-themed-muted hover:bg-themed-tertiary hover:text-themed-primary'
+      }`}
       title={`Maestro (${SHORTCUT_LABEL})`}
     >
       {isLoading && (
-        <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-themed-primary animate-pulse" />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
       )}
-      {!anthropicApiKey ? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-        </svg>
-      )}
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
     </button>
   );
 }

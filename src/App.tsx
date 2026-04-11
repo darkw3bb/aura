@@ -19,7 +19,7 @@ import { YearsView } from './components/Library/YearsView';
 import { StatsView } from './components/Stats/StatsView';
 import { ContextMenu } from './components/ContextMenu/ContextMenu';
 import { UpdateBanner } from './components/UpdateBanner';
-import { MaestroPanel, MaestroFAB } from './components/Agent/AgentChat';
+import { MaestroPanel, MaestroToggle } from './components/Agent/AgentChat';
 import { useAgentChatStore } from './stores/agentChatStore';
 
 function App() {
@@ -342,6 +342,9 @@ function App() {
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
+              <div className="ml-auto">
+                <MaestroToggle />
+              </div>
             </div>
           )}
           <div className="flex-1 overflow-hidden min-w-0">
@@ -374,7 +377,6 @@ function App() {
 
       <SearchOverlay />
       <ContextMenu />
-      {connected && <MaestroFAB />}
     </div>
   );
 }
