@@ -5,6 +5,7 @@ use crate::subsonic::client::SubsonicClient;
 use crate::subsonic::models::*;
 use crate::AppState;
 use futures_util::StreamExt;
+use reqwest;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -1055,4 +1056,44 @@ pub async fn remove_playlist_tag(
     let cache = cache.as_ref().ok_or("Cache not initialized")?;
     cache.remove_track_from_playlist(&playlist_id, &track_id)?;
     Ok(())
+}
+
+// -- Track lookup --
+
+#[tauri::command]
+pub async fn get_cached_track(
+    state: tauri::State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<Option<Song>, String> {
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.get_track_by_id(&id)
+}
+
+// -- AI Agent proxy --
+
+#[tauri::command]
+pub async fn proxy_anthropic(api_key: String, body: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", &api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("Anthropic API error ({}): {}", status, text));
+    }
+
+    Ok(text)
 }

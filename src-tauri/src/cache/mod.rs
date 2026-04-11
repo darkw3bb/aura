@@ -576,6 +576,43 @@ impl CacheDb {
         Ok(Some(album))
     }
 
+    pub fn get_track_by_id(&self, id: &str) -> Result<Option<Song>, String> {
+        self.conn
+            .query_row(
+                "SELECT id, title, album, album_id, artist, artist_id,
+                        track_num, year, genre, duration, bit_rate, cover_art,
+                        user_rating, disc_number, play_count, created
+                 FROM tracks WHERE id = ?1",
+                params![id],
+                |row| {
+                    Ok(Song {
+                        id: row.get(0)?,
+                        title: row.get(1)?,
+                        album: row.get(2)?,
+                        album_id: row.get(3)?,
+                        artist: row.get(4)?,
+                        artist_id: row.get(5)?,
+                        track: row.get(6)?,
+                        year: row.get(7)?,
+                        genre: row.get(8)?,
+                        duration: row.get(9)?,
+                        bit_rate: row.get(10)?,
+                        cover_art: row.get(11)?,
+                        user_rating: row.get(12)?,
+                        disc_number: row.get(13)?,
+                        play_count: row.get(14)?,
+                        created: row.get(15)?,
+                        size: None,
+                        content_type: None,
+                        suffix: None,
+                        path: None,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|e| format!("get_track_by_id error: {}", e))
+    }
+
     pub fn get_genres(&self) -> Result<Vec<Genre>, String> {
         let mut stmt = self
             .conn

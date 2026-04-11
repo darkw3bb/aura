@@ -286,4 +286,10 @@ export const api = {
     invoke<void>('delete_playlist', { playlistId }),
   setPlaylistColor: (playlistId: string, color: string) =>
     invoke<void>('set_playlist_color', { playlistId, color }),
+
+  getCachedTrack: (id: string) =>
+    invoke<Song | null>('get_cached_track', { id }),
+
+  proxyAnthropic: (apiKey: string, body: string) =>
+    invoke<string>('proxy_anthropic', { apiKey, body }),
 };

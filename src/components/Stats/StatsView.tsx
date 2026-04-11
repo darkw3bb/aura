@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../../lib/tauri';
 import type { StatsData } from '../../lib/tauri';
 import { useLibraryStore } from '../../stores/libraryStore';
+import { useUsageStore, usageForPeriod, previousPeriodUsage } from '../../stores/usageStore';
 import { CoverArt } from '../Library/CoverArt';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsiveRadar } from '@nivo/radar';
@@ -125,6 +126,13 @@ export function StatsView() {
       loadArtist(artistId);
     },
     [loadArtist, saveScrollTop],
+  );
+
+  const usageLog = useUsageStore(s => s.log);
+  const maestroUsage = useMemo(() => usageForPeriod(usageLog, period), [usageLog, period]);
+  const maestroPrev = useMemo(
+    () => period !== 'all' ? previousPeriodUsage(usageLog, period) : null,
+    [usageLog, period],
   );
 
   const showDelta = period !== 'all';
@@ -257,6 +265,21 @@ export function StatsView() {
                   : undefined
               }
             />
+            {maestroUsage.requests > 0 && (
+              <StatCard
+                label="Maestro Cost"
+                value={`$${maestroUsage.cost.toFixed(2)}`}
+                subtext={`${formatNumber(maestroUsage.inputTokens + maestroUsage.outputTokens)} tokens`}
+                delta={
+                  showDelta && maestroPrev
+                    ? getDelta(
+                        Math.round(maestroUsage.cost * 100),
+                        Math.round(maestroPrev.cost * 100),
+                      )
+                    : null
+                }
+              />
+            )}
           </div>
 
           {hasCharts && (
