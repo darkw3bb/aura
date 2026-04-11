@@ -265,6 +265,24 @@ impl SubsonicClient {
         Ok(())
     }
 
+    pub async fn update_playlist_remove_song(
+        &self,
+        playlist_id: &str,
+        song_index: i32,
+    ) -> Result<(), String> {
+        let idx = song_index.to_string();
+        let _: EmptyBody = self
+            .get(
+                "updatePlaylist",
+                &[
+                    ("playlistId", playlist_id),
+                    ("songIndexToRemove", &idx),
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
     /// Begin streaming an audio track. Returns the HTTP `Response` as soon
     /// as headers arrive so the caller can consume the body incrementally.
     pub async fn start_stream(&self, id: &str) -> Result<reqwest::Response, String> {

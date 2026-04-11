@@ -958,3 +958,37 @@ pub async fn apply_playlist_tag(
     let _ = cache.append_playlist_track_if_missing(&playlist_id, &song.id)?;
     Ok(playlist_id)
 }
+
+#[tauri::command]
+pub async fn remove_playlist_tag(
+    state: tauri::State<'_, Arc<AppState>>,
+    track_id: String,
+    tag_name: String,
+) -> Result<(), String> {
+    let name = tag_name.trim().to_string();
+    if name.is_empty() {
+        return Err("Tag name is empty".to_string());
+    }
+
+    let (playlist_id, position) = {
+        let cache = state.cache.lock();
+        let cache = cache.as_ref().ok_or("Cache not initialized")?;
+        let pid = cache
+            .find_playlist_id_by_name_ci(&name)?
+            .ok_or_else(|| format!("No playlist found for tag '{}'", name))?;
+        let pos = cache
+            .get_track_position_in_playlist(&pid, &track_id)?
+            .ok_or_else(|| "Track not found in playlist".to_string())?;
+        (pid, pos)
+    };
+
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    client
+        .update_playlist_remove_song(&playlist_id, position)
+        .await?;
+
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.remove_track_from_playlist(&playlist_id, &track_id)?;
+    Ok(())
+}

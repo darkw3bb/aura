@@ -69,6 +69,34 @@ function SortHeader({
 }
 
 // ---------------------------------------------------------------------------
+// Tag pill with hover-to-remove
+// ---------------------------------------------------------------------------
+
+function TagPill({ name, trackId, onRemove }: {
+  name: string;
+  trackId: string;
+  onRemove?: (trackId: string, tagName: string) => void;
+}) {
+  return (
+    <span
+      className="group text-[9px] leading-tight pl-1.5 pr-1 py-0.5 rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[100px] shrink-0 inline-flex items-center gap-0.5"
+      title={name}
+    >
+      {name}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(trackId, name); }}
+          className="hidden group-hover:inline-flex items-center justify-center w-3 h-3 rounded-full hover:bg-themed-secondary/30 text-themed-muted hover:text-themed-primary cursor-pointer bg-transparent border-0 p-0 text-[9px] leading-none"
+        >
+          &times;
+        </button>
+      )}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Memoized row
 // ---------------------------------------------------------------------------
 
@@ -88,6 +116,7 @@ interface TrackRowProps {
   focused: boolean;
   onPlay: (index: number) => void;
   onRatingChange: (trackId: string, rating: number) => void;
+  onRemoveTag?: (trackId: string, tagName: string) => void;
   onArtistClick: (artistId: string) => void;
   onAlbumClick: (albumId: string) => void;
   onMouseEnter: () => void;
@@ -110,6 +139,7 @@ const TrackRow = memo(function TrackRow({
   focused,
   onPlay,
   onRatingChange,
+  onRemoveTag,
   onArtistClick,
   onAlbumClick,
   onMouseEnter,
@@ -143,27 +173,9 @@ const TrackRow = memo(function TrackRow({
         )}
       </span>
       {showArt && <CoverArt coverArt={track.cover_art} artist={track.artist} albumName={track.album} size={80} className="w-8 h-8 rounded shrink-0" />}
-      <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 overflow-hidden">
-        <span className={`text-[13px] truncate ${isCurrentTrack ? 'text-themed-accent' : 'text-themed-primary'}`}>
-          {track.title}
-        </span>
-        {showTagPills && tagNames.length > 0 && (
-          <div className="flex flex-wrap gap-1 overflow-hidden max-h-[18px]">
-            {tagNames.slice(0, 5).map((t) => (
-              <span
-                key={t}
-                className="text-[9px] leading-tight px-1.5 py-0.5 rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[100px] shrink-0"
-                title={t}
-              >
-                {t}
-              </span>
-            ))}
-            {tagNames.length > 5 && (
-              <span className="text-[9px] text-themed-muted shrink-0">+{tagNames.length - 5}</span>
-            )}
-          </div>
-        )}
-      </div>
+      <span className={`flex-1 min-w-0 text-[13px] truncate ${isCurrentTrack ? 'text-themed-accent' : 'text-themed-primary'}`}>
+        {track.title}
+      </span>
       <span className="w-36 min-w-0 text-[13px] truncate text-themed-secondary">
         {track.artist_id ? (
           <button
@@ -184,6 +196,16 @@ const TrackRow = memo(function TrackRow({
           </button>
         ) : (track.album ?? 'Unknown')}
       </span>
+      {showTagPills && (
+        <div className="w-40 min-w-0 flex flex-wrap gap-1 overflow-hidden max-h-[18px]">
+          {tagNames.slice(0, 3).map((t) => (
+            <TagPill key={t} name={t} trackId={track.id} onRemove={onRemoveTag} />
+          ))}
+          {tagNames.length > 3 && (
+            <span className="text-[9px] text-themed-muted shrink-0">+{tagNames.length - 3}</span>
+          )}
+        </div>
+      )}
       {showBitRate && (
         <span className="w-14 text-right text-[11px] tabular-nums text-themed-muted">
           {track.bit_rate ? `${track.bit_rate}k` : ''}
@@ -247,6 +269,7 @@ interface VirtualTrackListProps {
   sortDirection?: 'asc' | 'desc';
   onSortChange?: (field: string) => void;
   showTagPills?: boolean;
+  onRemoveTag?: (trackId: string, tagName: string) => void;
 }
 
 const EMPTY_TAG_LIST: string[] = [];
@@ -265,6 +288,7 @@ export function VirtualTrackList({
   sortDirection,
   onSortChange,
   showTagPills = true,
+  onRemoveTag: onRemoveTagProp,
 }: VirtualTrackListProps) {
   const [tracks, setTracks] = useState<FlatSong[]>([]);
   const [tagByTrackId, setTagByTrackId] = useState<Record<string, string[]>>({});
@@ -345,7 +369,7 @@ export function VirtualTrackList({
 
   // ---- Virtualizer (onChange replaces the old unstable-dep useEffect) ----
 
-  const rowHeight = showTagPills ? 56 : 52;
+  const rowHeight = 52;
 
   const rowVirtualizer = useVirtualizer({
     count: tracks.length + (hasMore ? 1 : 0),
@@ -485,6 +509,26 @@ export function VirtualTrackList({
     [setRating, removeOnZeroRating],
   );
 
+  const handleRemoveTag = useCallback(
+    async (trackId: string, tagName: string) => {
+      try {
+        await api.removePlaylistTag(trackId, tagName);
+        setTagByTrackId((prev) => {
+          const tags = prev[trackId];
+          if (!tags) return prev;
+          const next = tags.filter((t) => t !== tagName);
+          return { ...prev, [trackId]: next };
+        });
+        window.dispatchEvent(new Event('aura-tags-changed'));
+      } catch (e) {
+        console.error('Failed to remove tag:', e);
+      }
+    },
+    [],
+  );
+
+  const resolvedOnRemoveTag = onRemoveTagProp ?? handleRemoveTag;
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-6 py-4">
@@ -504,6 +548,7 @@ export function VirtualTrackList({
         <SortHeader field="title" label="Title" className="flex-1 min-w-0" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
         <SortHeader field="artist" label="Artist" className="w-36 min-w-0" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
         <span className="w-36 min-w-0">Album</span>
+        {showTagPills && <span className="w-40 min-w-0">Tags</span>}
         {showBitRate && <span className="w-14 text-right">kbps</span>}
         <SortHeader field="user_rating" label="Rating" className="w-24" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />
         {showPlayCount && <SortHeader field="play_count" label="Plays" className="w-16 text-right" sortField={sortField} sortDirection={sortDirection} onSortChange={onSortChange} />}
@@ -561,6 +606,7 @@ export function VirtualTrackList({
                 focused={focusIndex === virtualRow.index}
                 onPlay={handlePlay}
                 onRatingChange={handleRatingChange}
+                onRemoveTag={resolvedOnRemoveTag}
                 onArtistClick={loadArtist}
                 onAlbumClick={loadAlbum}
                 onMouseEnter={() => {

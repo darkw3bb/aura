@@ -1139,6 +1139,35 @@ impl CacheDb {
         Ok(())
     }
 
+    pub fn get_track_position_in_playlist(
+        &self,
+        playlist_id: &str,
+        track_id: &str,
+    ) -> Result<Option<i32>, String> {
+        self.conn
+            .query_row(
+                "SELECT position FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2",
+                params![playlist_id, track_id],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| format!("get_track_position_in_playlist: {}", e))
+    }
+
+    pub fn remove_track_from_playlist(
+        &self,
+        playlist_id: &str,
+        track_id: &str,
+    ) -> Result<(), String> {
+        self.conn
+            .execute(
+                "DELETE FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2",
+                params![playlist_id, track_id],
+            )
+            .map_err(|e| format!("remove_track_from_playlist: {}", e))?;
+        Ok(())
+    }
+
     pub fn clear_playlist_tracks(&self, playlist_id: &str) -> Result<(), String> {
         self.conn
             .execute(

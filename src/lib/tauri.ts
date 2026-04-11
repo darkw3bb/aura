@@ -272,4 +272,6 @@ export const api = {
     invoke<TrackTagsEntry[]>('get_cached_tags_for_tracks', { trackIds }),
   applyPlaylistTag: (song: Song, tagName: string) =>
     invoke<string>('apply_playlist_tag', { song, tagName }),
+  removePlaylistTag: (trackId: string, tagName: string) =>
+    invoke<void>('remove_playlist_tag', { trackId, tagName }),
 };
