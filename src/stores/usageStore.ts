@@ -1,9 +1,7 @@
 import { create } from 'zustand';
+import { getModelConfig } from '../lib/models';
 
 const STORAGE_KEY = 'ae_maestro_usage';
-
-const COST_PER_M_INPUT = 3;
-const COST_PER_M_OUTPUT = 15;
 
 export interface UsageEntry {
   timestamp: number;
@@ -31,24 +29,22 @@ function persistLog(log: UsageEntry[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
 }
 
-export function computeCost(inputTokens: number, outputTokens: number): number {
-  return (inputTokens / 1_000_000) * COST_PER_M_INPUT +
-         (outputTokens / 1_000_000) * COST_PER_M_OUTPUT;
+export function computeCost(inputTokens: number, outputTokens: number, model?: string): number {
+  const cfg = getModelConfig(model ?? '');
+  return (inputTokens / 1_000_000) * cfg.costPerMInput +
+         (outputTokens / 1_000_000) * cfg.costPerMOutput;
 }
 
 function sumEntries(entries: UsageEntry[]): UsageTotals {
   let inputTokens = 0;
   let outputTokens = 0;
+  let cost = 0;
   for (const e of entries) {
     inputTokens += e.inputTokens;
     outputTokens += e.outputTokens;
+    cost += computeCost(e.inputTokens, e.outputTokens, e.model);
   }
-  return {
-    inputTokens,
-    outputTokens,
-    cost: computeCost(inputTokens, outputTokens),
-    requests: entries.length,
-  };
+  return { inputTokens, outputTokens, cost, requests: entries.length };
 }
 
 function getPeriodBounds(period: 'week' | 'month'): { start: number; prevStart: number } {

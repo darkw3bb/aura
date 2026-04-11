@@ -4,6 +4,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUsageStore, usageForPeriod } from '../../stores/usageStore';
 import { themes } from '../../themes';
+import { MODELS } from '../../lib/models';
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -15,7 +16,7 @@ export function Settings() {
   const { connect, error, connected, syncing, syncMessage, syncLibrary } =
     useLibraryStore();
   const { themeId, setTheme } = useThemeStore();
-  const { showTrackListArt, setShowTrackListArt, anthropicApiKey, setAnthropicApiKey } = useSettingsStore();
+  const { showTrackListArt, setShowTrackListArt, anthropicApiKey, setAnthropicApiKey, maestroModel, setMaestroModel } = useSettingsStore();
   const usageLog = useUsageStore(s => s.log);
   const clearUsage = useUsageStore(s => s.clearUsage);
   const allUsage = useMemo(() => usageForPeriod(usageLog, 'all'), [usageLog]);
@@ -151,6 +152,21 @@ export function Settings() {
           {anthropicApiKey && (
             <p className="text-xs text-green-400">API key configured</p>
           )}
+          <div>
+            <label htmlFor="ae-model" className="block text-xs text-themed-muted mb-1.5">Model</label>
+            <select
+              id="ae-model"
+              value={maestroModel}
+              onChange={(e) => setMaestroModel(e.target.value)}
+              className={inputClass}
+            >
+              {MODELS.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.label} — ${m.costPerMInput}/${m.costPerMOutput} per M tokens
+                </option>
+              ))}
+            </select>
+          </div>
           {allUsage.requests > 0 && (
             <div className="mt-3 p-3 rounded-lg bg-themed-tertiary space-y-2">
               <div className="flex items-center justify-between">

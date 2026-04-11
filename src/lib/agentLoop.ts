@@ -67,7 +67,6 @@ Examples:
 Use these liberally! Whenever you mention a playlist you created, an album, artist, or track, include an action link so the user can navigate there with one click. Always include action links at the end of task summaries (e.g. after creating a tag, link to open it).`;
 
 const MAX_ITERATIONS = 20;
-const MODEL = 'claude-sonnet-4-20250514';
 
 interface AnthropicResponse {
   id: string;
@@ -79,6 +78,7 @@ interface AnthropicResponse {
 export async function runAgentLoop(
   messages: ChatMessage[],
   apiKey: string,
+  model: string,
   onToolExecution?: (execution: ToolExecution) => void,
   onAssistantChunk?: (messages: ChatMessage[]) => void,
   onUsage?: (inputTokens: number, outputTokens: number, model: string) => void,
@@ -90,7 +90,7 @@ export async function runAgentLoop(
     iterations++;
 
     const body = JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       tools: toolDefinitions,
@@ -101,7 +101,7 @@ export async function runAgentLoop(
     const response: AnthropicResponse = JSON.parse(responseText);
 
     if (response.usage && onUsage) {
-      onUsage(response.usage.input_tokens, response.usage.output_tokens, MODEL);
+      onUsage(response.usage.input_tokens, response.usage.output_tokens, model);
     }
 
     conversationMessages.push({

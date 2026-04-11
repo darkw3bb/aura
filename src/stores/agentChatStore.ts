@@ -101,7 +101,7 @@ export const useAgentChatStore = create<AgentChatStore>((set, get) => ({
     const { activeSessionId, sessions, isLoading } = get();
     if (isLoading) return;
 
-    const apiKey = useSettingsStore.getState().anthropicApiKey;
+    const { anthropicApiKey: apiKey, maestroModel } = useSettingsStore.getState();
     if (!apiKey) return;
 
     let sessionId = activeSessionId;
@@ -133,6 +133,7 @@ export const useAgentChatStore = create<AgentChatStore>((set, get) => ({
       const finalMessages = await runAgentLoop(
         updatedMessages,
         apiKey,
+        maestroModel,
         (execution) => {
           set(s => {
             const existing = s.toolExecutions.findIndex(

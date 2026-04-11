@@ -6,6 +6,7 @@ import { useLibraryStore } from '../../stores/libraryStore';
 import { usePlayerStore } from '../../stores/playerStore';
 import { api } from '../../lib/tauri';
 import { type ChatMessage } from '../../lib/agentLoop';
+import { MODELS } from '../../lib/models';
 
 const TOOL_LABELS: Record<string, string> = {
   get_now_playing: 'Checking now playing',
@@ -294,7 +295,7 @@ function ChatPanel() {
     sendMessage,
     close,
   } = useAgentChatStore();
-  const { anthropicApiKey } = useSettingsStore();
+  const { anthropicApiKey, maestroModel, setMaestroModel } = useSettingsStore();
   const { setView } = useLibraryStore();
   const [input, setInput] = useState('');
   const [showSessions, setShowSessions] = useState(false);
@@ -365,6 +366,15 @@ function ChatPanel() {
           <h2 className="text-sm font-semibold text-themed-primary">Maestro</h2>
         </div>
         <div className="flex items-center gap-1">
+          <select
+            value={maestroModel}
+            onChange={(e) => setMaestroModel(e.target.value)}
+            className="text-[11px] bg-themed-tertiary text-themed-secondary rounded-md px-1.5 py-1 outline-none border border-themed cursor-pointer"
+          >
+            {MODELS.map(m => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
           <button
             onClick={() => newSession()}
             className="p-1.5 rounded-md hover:bg-themed-tertiary transition-colors cursor-pointer text-themed-muted"
