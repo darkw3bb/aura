@@ -20,6 +20,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_songs_by_genre: 'Loading genre tracks',
   list_playlists: 'Loading playlists',
   get_playlist_tracks: 'Loading playlist tracks',
+  find_similar_tracks: 'Finding similar tracks',
   apply_tag: 'Applying tag',
   apply_tag_bulk: 'Tagging tracks',
 };
@@ -311,13 +312,6 @@ function ChatPanel() {
   const timeline = buildTimeline(messages);
   const resolvedIds = getResolvedToolIds(messages);
 
-  const showThinking = isLoading && (() => {
-    if (timeline.length === 0) return true;
-    const last = timeline[timeline.length - 1];
-    if (last.kind !== 'tools') return true;
-    return last.tools.every(t => resolvedIds.has(t.id));
-  })();
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, timeline.length, isLoading]);
@@ -507,13 +501,13 @@ function ChatPanel() {
           );
         })}
 
-        {showThinking && (
+        {isLoading && (
           <div className="flex justify-start">
-            <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-md bg-themed-secondary">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-themed-muted animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 rounded-full bg-themed-muted animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 rounded-full bg-themed-muted animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-themed-secondary">
+              <div className="flex items-end gap-1 h-4">
+                <span className="w-1.5 bg-themed-muted/60 rounded-full animate-typing-dot" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 bg-themed-muted/60 rounded-full animate-typing-dot" style={{ animationDelay: '200ms' }} />
+                <span className="w-1.5 bg-themed-muted/60 rounded-full animate-typing-dot" style={{ animationDelay: '400ms' }} />
               </div>
             </div>
           </div>

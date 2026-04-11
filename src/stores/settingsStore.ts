@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_MODEL } from '../lib/models';
+import { DEFAULT_MODEL, MODELS } from '../lib/models';
 
 const STORAGE_KEY = 'ae_settings';
 
@@ -21,10 +21,18 @@ const DEFAULTS: Settings = {
   maestroModel: DEFAULT_MODEL,
 };
 
+const VALID_MODEL_IDS = new Set(MODELS.map(m => m.id));
+
 function load(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = { ...DEFAULTS, ...JSON.parse(raw) };
+      if (!VALID_MODEL_IDS.has(parsed.maestroModel)) {
+        parsed.maestroModel = DEFAULT_MODEL;
+      }
+      return parsed;
+    }
   } catch { /* ignore corrupt data */ }
   return { ...DEFAULTS };
 }
