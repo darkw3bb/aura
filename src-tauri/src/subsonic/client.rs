@@ -283,6 +283,11 @@ impl SubsonicClient {
         Ok(())
     }
 
+    pub async fn delete_playlist(&self, id: &str) -> Result<(), String> {
+        let _: EmptyBody = self.get("deletePlaylist", &[("id", id)]).await?;
+        Ok(())
+    }
+
     /// Begin streaming an audio track. Returns the HTTP `Response` as soon
     /// as headers arrive so the caller can consume the body incrementally.
     pub async fn start_stream(&self, id: &str) -> Result<reqwest::Response, String> {

@@ -873,9 +873,16 @@ pub async fn get_cached_track_tags(
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TagInfo {
+    pub name: String,
+    pub color: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TrackTagsEntry {
     pub track_id: String,
-    pub tags: Vec<String>,
+    pub tags: Vec<TagInfo>,
 }
 
 #[tauri::command]
@@ -892,7 +899,13 @@ pub async fn get_cached_tags_for_tracks(
     let out: Vec<TrackTagsEntry> = track_ids
         .into_iter()
         .zip(tag_lists.into_iter())
-        .map(|(track_id, tags)| TrackTagsEntry { track_id, tags })
+        .map(|(track_id, pairs)| TrackTagsEntry {
+            track_id,
+            tags: pairs
+                .into_iter()
+                .map(|(name, color)| TagInfo { name, color })
+                .collect(),
+        })
         .collect();
     Ok(out)
 }
@@ -957,6 +970,38 @@ pub async fn apply_playlist_tag(
     let cache = cache.as_ref().ok_or("Cache not initialized")?;
     let _ = cache.append_playlist_track_if_missing(&playlist_id, &song.id)?;
     Ok(playlist_id)
+}
+
+const VALID_PILL_COLORS: &[&str] = &[
+    "default", "red", "orange", "yellow", "green", "blue", "purple", "pink", "teal",
+];
+
+#[tauri::command]
+pub async fn set_playlist_color(
+    state: tauri::State<'_, Arc<AppState>>,
+    playlist_id: String,
+    color: String,
+) -> Result<(), String> {
+    if !VALID_PILL_COLORS.contains(&color.as_str()) {
+        return Err(format!("Invalid color '{}'. Valid: {:?}", color, VALID_PILL_COLORS));
+    }
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.set_playlist_color(&playlist_id, &color)
+}
+
+#[tauri::command]
+pub async fn delete_playlist(
+    state: tauri::State<'_, Arc<AppState>>,
+    playlist_id: String,
+) -> Result<(), String> {
+    let client = state.client.lock().clone().ok_or("Not connected")?;
+    client.delete_playlist(&playlist_id).await?;
+
+    let cache = state.cache.lock();
+    let cache = cache.as_ref().ok_or("Cache not initialized")?;
+    cache.delete_playlist(&playlist_id)?;
+    Ok(())
 }
 
 #[tauri::command]

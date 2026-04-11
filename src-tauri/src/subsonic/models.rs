@@ -238,6 +238,12 @@ pub struct PlaylistSummary {
     pub owner: Option<String>,
     #[serde(default)]
     pub public: Option<bool>,
+    #[serde(default = "default_pill_color")]
+    pub color: Option<String>,
+}
+
+fn default_pill_color() -> Option<String> {
+    Some("default".to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { FlatSong } from '../../lib/tauri';
+import type { FlatSong, TagInfo } from '../../lib/tauri';
 import { api } from '../../lib/tauri';
 import { flatSongToSong } from '../../lib/flatSong';
 import { usePlayerStore } from '../../stores/playerStore';
@@ -72,14 +72,18 @@ function SortHeader({
 // Tag pill with hover-to-remove
 // ---------------------------------------------------------------------------
 
-export function TagPill({ name, trackId, onRemove }: {
+export function TagPill({ name, trackId, colorClass, onRemove }: {
   name: string;
   trackId: string;
+  colorClass?: string;
   onRemove?: (trackId: string, tagName: string) => void;
 }) {
+  const pillClass = colorClass && colorClass !== 'pill-color-default'
+    ? colorClass
+    : '';
   return (
     <span
-      className="group text-[8px] leading-tight pl-1.5 pr-1 py-px rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[90px] shrink-0 inline-flex items-center gap-0.5"
+      className={`group text-[8px] leading-tight pl-1.5 pr-1 py-px rounded-full truncate max-w-[90px] shrink-0 inline-flex items-center gap-0.5 ${pillClass || 'bg-themed-tertiary text-themed-secondary'}`}
       title={name}
     >
       {name}
@@ -112,7 +116,7 @@ interface TrackRowProps {
   showAdded?: boolean;
   showArt?: boolean;
   showTagPills?: boolean;
-  tagNames: string[];
+  tagNames: TagInfo[];
   focused: boolean;
   onPlay: (index: number) => void;
   onRatingChange: (trackId: string, rating: number) => void;
@@ -199,7 +203,7 @@ const TrackRow = memo(function TrackRow({
       {showTagPills && (
         <div className="w-40 min-w-0 flex flex-wrap gap-0.5 overflow-hidden max-h-[30px] items-start">
           {tagNames.slice(0, 6).map((t) => (
-            <TagPill key={t} name={t} trackId={track.id} onRemove={onRemoveTag} />
+            <TagPill key={t.name} name={t.name} trackId={track.id} colorClass={`pill-color-${t.color ?? 'default'}`} onRemove={onRemoveTag} />
           ))}
           {tagNames.length > 6 && (
             <span className="text-[8px] text-themed-muted shrink-0">+{tagNames.length - 6}</span>
@@ -246,7 +250,7 @@ const TrackRow = memo(function TrackRow({
   prev.showArt === next.showArt &&
   prev.showTagPills === next.showTagPills &&
   prev.tagNames.length === next.tagNames.length &&
-  prev.tagNames.every((t, i) => t === next.tagNames[i]) &&
+  prev.tagNames.every((t, i) => t.name === next.tagNames[i].name && t.color === next.tagNames[i].color) &&
   prev.focused === next.focused
 );
 
@@ -272,7 +276,7 @@ interface VirtualTrackListProps {
   onRemoveTag?: (trackId: string, tagName: string) => void;
 }
 
-const EMPTY_TAG_LIST: string[] = [];
+const EMPTY_TAG_LIST: TagInfo[] = [];
 
 export function VirtualTrackList({
   fetchPage,
@@ -291,7 +295,7 @@ export function VirtualTrackList({
   onRemoveTag: onRemoveTagProp,
 }: VirtualTrackListProps) {
   const [tracks, setTracks] = useState<FlatSong[]>([]);
-  const [tagByTrackId, setTagByTrackId] = useState<Record<string, string[]>>({});
+  const [tagByTrackId, setTagByTrackId] = useState<Record<string, TagInfo[]>>({});
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -441,7 +445,7 @@ export function VirtualTrackList({
       }
       Promise.all(chunks.map((c) => api.getCachedTagsForTracks(c)))
         .then((parts) => {
-          const next: Record<string, string[]> = {};
+          const next: Record<string, TagInfo[]> = {};
           for (const part of parts) {
             for (const e of part) {
               const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
@@ -466,7 +470,7 @@ export function VirtualTrackList({
       }
       Promise.all(chunks.map((c) => api.getCachedTagsForTracks(c)))
         .then((parts) => {
-          const next: Record<string, string[]> = {};
+          const next: Record<string, TagInfo[]> = {};
           for (const part of parts) {
             for (const e of part) {
               const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
@@ -516,7 +520,7 @@ export function VirtualTrackList({
         setTagByTrackId((prev) => {
           const tags = prev[trackId];
           if (!tags) return prev;
-          const next = tags.filter((t) => t !== tagName);
+          const next = tags.filter((t) => t.name !== tagName);
           return { ...prev, [trackId]: next };
         });
         window.dispatchEvent(new Event('aura-tags-changed'));

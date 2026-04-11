@@ -120,6 +120,9 @@ impl CacheDb {
         self.conn
             .execute_batch("ALTER TABLE tracks ADD COLUMN created TEXT")
             .ok();
+        self.conn
+            .execute_batch("ALTER TABLE playlists ADD COLUMN color TEXT NOT NULL DEFAULT 'default'")
+            .ok();
 
         // Rebuild FTS indexes so existing caches get populated
         self.conn
@@ -1241,7 +1244,8 @@ impl CacheDb {
             .conn
             .prepare(
                 "SELECT p.id, p.name,
-                        (SELECT COUNT(*) FROM playlist_tracks pt WHERE pt.playlist_id = p.id) as cnt
+                        (SELECT COUNT(*) FROM playlist_tracks pt WHERE pt.playlist_id = p.id) as cnt,
+                        p.color
                  FROM playlists p
                  ORDER BY LOWER(p.name)",
             )
@@ -1256,6 +1260,7 @@ impl CacheDb {
                     created: None,
                     owner: None,
                     public: None,
+                    color: row.get(3)?,
                 })
             })
             .map_err(|e| format!("get_cached_playlists query: {}", e))?;
@@ -1362,8 +1367,8 @@ impl CacheDb {
         Ok(n > 0)
     }
 
-    /// For each track id (in the same order), return tag names from local cache.
-    pub fn get_tags_for_track_ids(&self, track_ids: &[String]) -> Result<Vec<Vec<String>>, String> {
+    /// For each track id (in the same order), return tag names + colors from local cache.
+    pub fn get_tags_for_track_ids(&self, track_ids: &[String]) -> Result<Vec<Vec<(String, String)>>, String> {
         if track_ids.is_empty() {
             return Ok(vec![]);
         }
@@ -1373,7 +1378,7 @@ impl CacheDb {
             .collect::<Vec<_>>()
             .join(",");
         let sql = format!(
-            "SELECT pt.track_id, p.name
+            "SELECT pt.track_id, p.name, COALESCE(p.color, 'default')
              FROM playlist_tracks pt
              JOIN playlists p ON p.id = pt.playlist_id
              WHERE pt.track_id IN ({})
@@ -1390,20 +1395,41 @@ impl CacheDb {
             .map_err(|e| format!("get_tags_for_track_ids query: {}", e))?;
 
         use std::collections::HashMap;
-        let mut map: HashMap<String, Vec<String>> = HashMap::new();
+        let mut map: HashMap<String, Vec<(String, String)>> = HashMap::new();
         while let Some(row) = rows
             .next()
             .map_err(|e| format!("get_tags_for_track_ids row: {}", e))?
         {
             let tid: String = row.get(0).map_err(|e| format!("get_tags_for_track_ids: {}", e))?;
             let name: String = row.get(1).map_err(|e| format!("get_tags_for_track_ids: {}", e))?;
-            map.entry(tid).or_default().push(name);
+            let color: String = row.get(2).map_err(|e| format!("get_tags_for_track_ids: {}", e))?;
+            map.entry(tid).or_default().push((name, color));
         }
 
         Ok(track_ids
             .iter()
             .map(|id| map.remove(id).unwrap_or_default())
             .collect())
+    }
+
+    pub fn delete_playlist(&self, id: &str) -> Result<(), String> {
+        self.conn
+            .execute("DELETE FROM playlist_tracks WHERE playlist_id = ?1", params![id])
+            .map_err(|e| format!("delete_playlist tracks: {}", e))?;
+        self.conn
+            .execute("DELETE FROM playlists WHERE id = ?1", params![id])
+            .map_err(|e| format!("delete_playlist: {}", e))?;
+        Ok(())
+    }
+
+    pub fn set_playlist_color(&self, id: &str, color: &str) -> Result<(), String> {
+        self.conn
+            .execute(
+                "UPDATE playlists SET color = ?2 WHERE id = ?1",
+                params![id, color],
+            )
+            .map_err(|e| format!("set_playlist_color: {}", e))?;
+        Ok(())
     }
 }
 

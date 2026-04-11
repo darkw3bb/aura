@@ -205,6 +205,8 @@ pub fn run() {
             commands::get_cached_tags_for_tracks,
             commands::apply_playlist_tag,
             commands::remove_playlist_tag,
+            commands::delete_playlist,
+            commands::set_playlist_color,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

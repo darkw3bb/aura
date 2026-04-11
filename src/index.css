@@ -275,4 +275,41 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 500px;
   }
+
+  .pill-color-default {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+  }
+  .pill-color-red {
+    background: color-mix(in srgb, hsl(0 70% 60%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(0 70% 60%) 70%, var(--text-primary));
+  }
+  .pill-color-orange {
+    background: color-mix(in srgb, hsl(25 80% 55%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(25 80% 55%) 70%, var(--text-primary));
+  }
+  .pill-color-yellow {
+    background: color-mix(in srgb, hsl(45 80% 50%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(45 80% 50%) 70%, var(--text-primary));
+  }
+  .pill-color-green {
+    background: color-mix(in srgb, hsl(145 60% 45%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(145 60% 45%) 70%, var(--text-primary));
+  }
+  .pill-color-blue {
+    background: color-mix(in srgb, hsl(210 70% 55%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(210 70% 55%) 70%, var(--text-primary));
+  }
+  .pill-color-purple {
+    background: color-mix(in srgb, hsl(270 60% 60%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(270 60% 60%) 70%, var(--text-primary));
+  }
+  .pill-color-pink {
+    background: color-mix(in srgb, hsl(330 70% 60%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(330 70% 60%) 70%, var(--text-primary));
+  }
+  .pill-color-teal {
+    background: color-mix(in srgb, hsl(180 55% 45%) 25%, var(--bg-tertiary));
+    color: color-mix(in srgb, hsl(180 55% 45%) 70%, var(--text-primary));
+  }
 }

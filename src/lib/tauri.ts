@@ -169,11 +169,17 @@ export interface PlaylistSummary {
   created?: string;
   owner?: string;
   public?: boolean;
+  color?: string;
+}
+
+export interface TagInfo {
+  name: string;
+  color: string;
 }
 
 export interface TrackTagsEntry {
   trackId: string;
-  tags: string[];
+  tags: TagInfo[];
 }
 
 export interface StatsData {
@@ -274,4 +280,8 @@ export const api = {
     invoke<string>('apply_playlist_tag', { song, tagName }),
   removePlaylistTag: (trackId: string, tagName: string) =>
     invoke<void>('remove_playlist_tag', { trackId, tagName }),
+  deletePlaylist: (playlistId: string) =>
+    invoke<void>('delete_playlist', { playlistId }),
+  setPlaylistColor: (playlistId: string, color: string) =>
+    invoke<void>('set_playlist_color', { playlistId, color }),
 };

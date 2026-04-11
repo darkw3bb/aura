@@ -6,6 +6,7 @@ import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 import { useTrackTargetStore } from '../../stores/trackTargetStore';
 import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 import { api } from '../../lib/tauri';
+import type { TagInfo } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
 import { TagPill } from '../TrackList/VirtualTrackList';
@@ -22,7 +23,7 @@ export function AlbumDetail() {
   const { playTrackInContext, setRating, currentTrack, isPlaying, addToQueue, insertNextInQueue } = usePlayerStore();
   const showContextMenu = useContextMenuStore((s) => s.show);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [tagByTrackId, setTagByTrackId] = useState<Record<string, string[]>>({});
+  const [tagByTrackId, setTagByTrackId] = useState<Record<string, TagInfo[]>>({});
 
   const handleAlbumRating = async (rating: number) => {
     if (!selectedAlbum) return;
@@ -65,7 +66,7 @@ export function AlbumDetail() {
       api
         .getCachedTagsForTracks(ids)
         .then((entries) => {
-          const next: Record<string, string[]> = {};
+          const next: Record<string, TagInfo[]> = {};
           for (const e of entries) {
             const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
             next[id] = e.tags;
@@ -84,7 +85,7 @@ export function AlbumDetail() {
       api
         .getCachedTagsForTracks(ids)
         .then((entries) => {
-          const next: Record<string, string[]> = {};
+          const next: Record<string, TagInfo[]> = {};
           for (const e of entries) {
             const id = 'trackId' in e ? e.trackId : (e as { track_id: string }).track_id;
             next[id] = e.tags;
@@ -104,7 +105,7 @@ export function AlbumDetail() {
         setTagByTrackId((prev) => {
           const tags = prev[trackId];
           if (!tags) return prev;
-          return { ...prev, [trackId]: tags.filter((t) => t !== tagName) };
+          return { ...prev, [trackId]: tags.filter((t) => t.name !== tagName) };
         });
         window.dispatchEvent(new Event('aura-tags-changed'));
       } catch (e) {
@@ -229,8 +230,8 @@ export function AlbumDetail() {
             </div>
             {tags.length > 0 && (
               <div className="w-36 shrink-0 flex flex-wrap gap-0.5 overflow-hidden max-h-[34px] items-start">
-                {tags.slice(0, 6).map((name) => (
-                  <TagPill key={name} name={name} trackId={song.id} onRemove={handleRemoveTag} />
+                {tags.slice(0, 6).map((t) => (
+                  <TagPill key={t.name} name={t.name} trackId={song.id} colorClass={`pill-color-${t.color ?? 'default'}`} onRemove={handleRemoveTag} />
                 ))}
                 {tags.length > 6 && (
                   <span className="text-[8px] text-themed-muted shrink-0">+{tags.length - 6}</span>
