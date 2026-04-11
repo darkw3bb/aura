@@ -163,16 +163,6 @@ export const toolDefinitions: ToolDefinition[] = [
   },
 ];
 
-function slim<T extends Record<string, unknown>>(obj: T, keys: string[]): Partial<T> {
-  const result: Record<string, unknown> = {};
-  for (const k of keys) {
-    if (k in obj && obj[k] !== undefined && obj[k] !== null) {
-      result[k] = obj[k];
-    }
-  }
-  return result as Partial<T>;
-}
-
 function fmtDuration(secs?: number): string {
   if (!secs) return '';
   const m = Math.floor(secs / 60);
@@ -227,16 +217,17 @@ const ARTIST_FIELDS: FieldSpec[] = [
   { key: 'album_count', label: 'albums' },
 ];
 
-function formatTable(rows: Record<string, unknown>[], fields: FieldSpec[]): string {
+function formatTable(rows: object[], fields: FieldSpec[]): string {
   if (rows.length === 0) return '(none)';
   const header = fields.map(f => f.label).join('\t');
-  const lines = rows.map(row =>
-    fields.map(f => {
-      const v = row[f.key];
+  const lines = rows.map(row => {
+    const r = row as Record<string, unknown>;
+    return fields.map(f => {
+      const v = r[f.key];
       if (v === undefined || v === null) return '';
       return f.fmt ? f.fmt(v) : String(v);
-    }).join('\t'),
-  );
+    }).join('\t');
+  });
   return header + '\n' + lines.join('\n');
 }
 
@@ -405,7 +396,7 @@ export async function dispatchTool(
       const playlistId = input.playlist_id as string | undefined;
       const trackIds = input.track_ids as string[] | undefined;
 
-      let sourceTracks: Array<Record<string, unknown>> = [];
+      let sourceTracks: Song[] = [];
 
       if (playlistId) {
         sourceTracks = await api.getCachedPlaylistTracks(playlistId, 0, 200);
@@ -422,7 +413,7 @@ export async function dispatchTool(
       const artistIds = [...new Set(sourceTracks.map(t => t.artist_id).filter(Boolean))] as string[];
       const genres = [...new Set(sourceTracks.map(t => t.genre).filter(Boolean))] as string[];
 
-      const candidates = new Map<string, Record<string, unknown>>();
+      const candidates = new Map<string, Song>();
 
       // Gather tracks by the same artists
       for (const artistId of artistIds.slice(0, 10)) {
@@ -433,7 +424,7 @@ export async function dispatchTool(
             const album = await api.getAlbum(albumId).catch(() => null);
             for (const s of album?.song ?? []) {
               if (!excludeIds.has(s.id) && !candidates.has(s.id)) {
-                candidates.set(s.id, s as unknown as Record<string, unknown>);
+                candidates.set(s.id, s);
               }
             }
           }
@@ -446,7 +437,7 @@ export async function dispatchTool(
           const songs = await api.getSongsByGenre(genre, 50, 0);
           for (const s of songs) {
             if (!excludeIds.has(s.id) && !candidates.has(s.id)) {
-              candidates.set(s.id, s as unknown as Record<string, unknown>);
+              candidates.set(s.id, s);
             }
           }
         } catch { /* skip */ }
