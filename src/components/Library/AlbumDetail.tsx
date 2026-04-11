@@ -8,6 +8,7 @@ import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 import { api } from '../../lib/tauri';
 import { CoverArt } from './CoverArt';
 import { StarRating } from '../Rating/StarRating';
+import { TagPill } from '../TrackList/VirtualTrackList';
 
 function formatDuration(secs?: number): string {
   if (!secs) return '--:--';
@@ -95,6 +96,23 @@ export function AlbumDetail() {
     window.addEventListener('aura-tags-changed', onTags);
     return () => window.removeEventListener('aura-tags-changed', onTags);
   }, [songs]);
+
+  const handleRemoveTag = useCallback(
+    async (trackId: string, tagName: string) => {
+      try {
+        await api.removePlaylistTag(trackId, tagName);
+        setTagByTrackId((prev) => {
+          const tags = prev[trackId];
+          if (!tags) return prev;
+          return { ...prev, [trackId]: tags.filter((t) => t !== tagName) };
+        });
+        window.dispatchEvent(new Event('aura-tags-changed'));
+      } catch (e) {
+        console.error('Failed to remove tag:', e);
+      }
+    },
+    [],
+  );
 
   const handleAlbumMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -196,19 +214,6 @@ export function AlbumDetail() {
               <p className={`text-[13px] truncate ${currentTrack?.id === song.id ? 'text-themed-accent' : 'text-themed-primary'}`}>
                 {song.title}
               </p>
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-0.5 max-h-[18px] overflow-hidden">
-                  {tags.slice(0, 5).map((name) => (
-                    <span
-                      key={name}
-                      className="text-[9px] leading-tight px-1.5 py-0.5 rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[100px]"
-                      title={name}
-                    >
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              )}
               {song.artist && song.artist !== selectedAlbum.artist && (
                 <p className="text-[11px] truncate text-themed-muted">
                   {song.artist_id ? (
@@ -222,6 +227,16 @@ export function AlbumDetail() {
                 </p>
               )}
             </div>
+            {tags.length > 0 && (
+              <div className="w-36 shrink-0 flex flex-wrap gap-0.5 overflow-hidden max-h-[34px] items-start">
+                {tags.slice(0, 6).map((name) => (
+                  <TagPill key={name} name={name} trackId={song.id} onRemove={handleRemoveTag} />
+                ))}
+                {tags.length > 6 && (
+                  <span className="text-[8px] text-themed-muted shrink-0">+{tags.length - 6}</span>
+                )}
+              </div>
+            )}
             <span className="text-[11px] tabular-nums w-14 text-right text-themed-muted">
               {song.bit_rate ? `${song.bit_rate}k` : ''}
             </span>

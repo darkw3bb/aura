@@ -72,14 +72,14 @@ function SortHeader({
 // Tag pill with hover-to-remove
 // ---------------------------------------------------------------------------
 
-function TagPill({ name, trackId, onRemove }: {
+export function TagPill({ name, trackId, onRemove }: {
   name: string;
   trackId: string;
   onRemove?: (trackId: string, tagName: string) => void;
 }) {
   return (
     <span
-      className="group text-[9px] leading-tight pl-1.5 pr-1 py-0.5 rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[100px] shrink-0 inline-flex items-center gap-0.5"
+      className="group text-[8px] leading-tight pl-1.5 pr-1 py-px rounded-full bg-themed-tertiary text-themed-secondary truncate max-w-[90px] shrink-0 inline-flex items-center gap-0.5"
       title={name}
     >
       {name}
@@ -87,7 +87,7 @@ function TagPill({ name, trackId, onRemove }: {
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(trackId, name); }}
-          className="hidden group-hover:inline-flex items-center justify-center w-3 h-3 rounded-full hover:bg-themed-secondary/30 text-themed-muted hover:text-themed-primary cursor-pointer bg-transparent border-0 p-0 text-[9px] leading-none"
+          className="hidden group-hover:inline-flex items-center justify-center w-2.5 h-2.5 rounded-full hover:bg-themed-secondary/30 text-themed-muted hover:text-themed-primary cursor-pointer bg-transparent border-0 p-0 text-[8px] leading-none"
         >
           &times;
         </button>
@@ -197,12 +197,12 @@ const TrackRow = memo(function TrackRow({
         ) : (track.album ?? 'Unknown')}
       </span>
       {showTagPills && (
-        <div className="w-40 min-w-0 flex flex-wrap gap-1 overflow-hidden max-h-[18px]">
-          {tagNames.slice(0, 3).map((t) => (
+        <div className="w-40 min-w-0 flex flex-wrap gap-0.5 overflow-hidden max-h-[30px] items-start">
+          {tagNames.slice(0, 6).map((t) => (
             <TagPill key={t} name={t} trackId={track.id} onRemove={onRemoveTag} />
           ))}
-          {tagNames.length > 3 && (
-            <span className="text-[9px] text-themed-muted shrink-0">+{tagNames.length - 3}</span>
+          {tagNames.length > 6 && (
+            <span className="text-[8px] text-themed-muted shrink-0">+{tagNames.length - 6}</span>
           )}
         </div>
       )}
