@@ -10,6 +10,7 @@ import { PlayerBar } from './components/Player/PlayerBar';
 import { SearchOverlay } from './components/Search/SearchOverlay';
 import { PlaylistsView } from './components/Playlist/PlaylistsView';
 import { useCommandPaletteStore } from './stores/commandPaletteStore';
+import { useTrackTargetStore } from './stores/trackTargetStore';
 import { RatedTracks } from './components/TrackList/RatedTracks';
 import { AllTracks } from './components/TrackList/AllTracks';
 import { GenreList } from './components/Library/GenreList';
@@ -68,6 +69,18 @@ function App() {
         setGoMode(false);
       }, 2000);
       return;
+    }
+
+    if (e.key === 't' && !isTyping && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const { open } = useCommandPaletteStore.getState();
+      if (!open) {
+        const { keyboardTarget, hoverTarget } = useTrackTargetStore.getState();
+        const target = keyboardTarget ?? hoverTarget;
+        if (target) {
+          e.preventDefault();
+          useCommandPaletteStore.getState().openPaletteTagStep(target);
+        }
+      }
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
