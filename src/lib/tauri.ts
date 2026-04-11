@@ -265,11 +265,11 @@ export const api = {
   syncPlaylistsToCache: () => invoke<number>('sync_playlists_to_cache'),
   listCachedPlaylists: () => invoke<PlaylistSummary[]>('list_cached_playlists'),
   getCachedPlaylistTracks: (playlistId: string, offset?: number, limit?: number) =>
-    invoke<FlatSong[]>('get_cached_playlist_tracks', { playlist_id: playlistId, offset, limit }),
+    invoke<FlatSong[]>('get_cached_playlist_tracks', { playlistId, offset, limit }),
   getCachedTrackTags: (trackId: string) =>
-    invoke<string[]>('get_cached_track_tags', { track_id: trackId }),
+    invoke<string[]>('get_cached_track_tags', { trackId }),
   getCachedTagsForTracks: (trackIds: string[]) =>
-    invoke<TrackTagsEntry[]>('get_cached_tags_for_tracks', { track_ids: trackIds }),
+    invoke<TrackTagsEntry[]>('get_cached_tags_for_tracks', { trackIds }),
   applyPlaylistTag: (song: Song, tagName: string) =>
-    invoke<string>('apply_playlist_tag', { song, tag_name: tagName }),
+    invoke<string>('apply_playlist_tag', { song, tagName }),
 };
