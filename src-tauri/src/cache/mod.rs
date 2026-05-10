@@ -61,7 +61,8 @@ impl CacheDb {
                 bit_rate INTEGER,
                 cover_art TEXT,
                 user_rating INTEGER DEFAULT 0,
-                disc_number INTEGER
+                disc_number INTEGER,
+                play_count INTEGER DEFAULT 0
             );
             CREATE VIRTUAL TABLE IF NOT EXISTS tracks_fts USING fts5(
                 title, album, artist, genre,
